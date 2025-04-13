@@ -1,32 +1,52 @@
 import React, { useState } from 'react';
 import logo from '../assets/logo.png';
+import openaiService from '../utils/openaiService';
 
 interface HeaderProps {
   onNewChat?: () => void;
   onSidebarToggle?: () => void;
   isSidebarOpen?: boolean;
   onLogoClick?: () => void;
+  onModelSelect?: (model: string) => void;
 }
 
 /**
  * Header组件
  * 透明背景，左侧包含控制按钮，右侧包含logo
  */
-const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOpen, onLogoClick }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  onNewChat, 
+  onSidebarToggle, 
+  isSidebarOpen, 
+  onLogoClick,
+  onModelSelect
+}) => {
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const models = ['GPT-3.5', 'GPT-4', 'Claude', 'Gemini'];
+  const models = ['GPT-3.5', 'GPT-4', 'Claude', 'Gemini', 'OpenAI Test'];
 
   const toggleModelMenu = () => {
     setIsModelMenuOpen(!isModelMenuOpen);
   };
 
-  const selectModel = (model: string) => {
-    setSelectedModel(model);
+  // 清除API密钥
+  const clearApiKey = () => {
+    openaiService.setApiKey('');
+    alert('API密钥已清除');
     setIsModelMenuOpen(false);
   };
 
-  // 处理新建聊天按钮点击
+  const selectModel = (model: string) => {
+    setSelectedModel(model);
+    setIsModelMenuOpen(false);
+    
+    // 通知父组件模型选择变化
+    if (onModelSelect) {
+      onModelSelect(model);
+    }
+  };
+
+  // 处理新建按钮点击
   const handleNewChat = () => {
     if (onNewChat) {
       onNewChat();
@@ -105,6 +125,18 @@ const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOp
                 {model}
               </div>
             ))}
+            {/* 添加清除API密钥选项 */}
+            <div className="border-t border-gray-700 mt-1">
+              <div 
+                className="px-4 py-2 cursor-pointer hover:bg-[#424242] text-red-400 flex items-center"
+                onClick={clearApiKey}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                清除API密钥
+              </div>
+            </div>
           </div>
         )}
       </div>
