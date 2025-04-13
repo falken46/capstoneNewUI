@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,9 +9,32 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #ffffff;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+@layer components {
+  .mono-tag {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+}
+
+@keyframes pulse-gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 3px rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    /* 在动画中间点增强泛光效果 */
+    box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.6);
+  }
+}
+
+.query-bar:focus-within {
+  /* 应用脉动动画：持续1.5秒，无限循环，缓动效果 */
+  animation: pulse-gold-glow 2s infinite ease-in-out;
 }
