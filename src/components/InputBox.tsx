@@ -7,6 +7,8 @@ interface InputBoxProps {
   placeholder?: string;
   layoutMode: 'compact' | 'expanded';
   containerClassName?: string;
+  isLoading?: boolean;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 /**
@@ -20,18 +22,35 @@ const InputBox: React.FC<InputBoxProps> = ({
   onSubmit,
   placeholder = '您想了解什么？',
   layoutMode,
-  containerClassName = ''
+  containerClassName = '',
+  isLoading = false,
+  textareaRef: externalTextareaRef
 }) => {
   const hasContent = inputValue.trim().length > 0;
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+  // 使用传入的ref或内部ref
+  const textareaRef = externalTextareaRef || internalTextareaRef;
 
   // 自动调整textarea高度的函数
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
+      // 先将高度设为auto以获取准确的scrollHeight
       textarea.style.height = 'auto';
-      const newHeight = Math.min(textarea.scrollHeight, layoutMode === 'compact' ? 120 : 200);
+      
+      // 计算新高度，但不超过最大高度
+      const maxHeight = layoutMode === 'compact' ? 300 : 200;
+      const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+      
+      // 设置新高度
       textarea.style.height = `${newHeight}px`;
+      
+      // 当内容超过最大高度时，确保可以滚动
+      if (textarea.scrollHeight > maxHeight) {
+        textarea.style.overflowY = 'auto';
+      } else {
+        textarea.style.overflowY = 'hidden';
+      }
     }
   };
 
@@ -39,7 +58,7 @@ const InputBox: React.FC<InputBoxProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (hasContent) {
+      if (hasContent && !isLoading) {
         onSubmit(e as unknown as React.FormEvent);
       }
     }
@@ -72,7 +91,7 @@ const InputBox: React.FC<InputBoxProps> = ({
   const getTextareaStyle = () => {
     const baseStyle = {
       resize: "none" as const,
-      overflow: "hidden" as const
+      overflow: "auto" as const  // 从 "hidden" 改为 "auto" 允许滚动
     };
     
     if (layoutMode === 'expanded') {
@@ -87,7 +106,7 @@ const InputBox: React.FC<InputBoxProps> = ({
       return {
         ...baseStyle,
         minHeight: "44px", // 较大最小高度
-        maxHeight: "120px"
+        maxHeight: "300px" // 从120px增加到200px
       };
     }
   };
@@ -103,7 +122,12 @@ const InputBox: React.FC<InputBoxProps> = ({
 
   return (
     <div className={getContainerClassName()}>
-      <form onSubmit={onSubmit} className="w-full text-base flex flex-col gap-2 items-center justify-center relative z-10">
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        if (!isLoading && hasContent) {
+          onSubmit(e);
+        }
+      }} className="w-full text-base flex flex-col gap-2 items-center justify-center relative z-10">
         <div className="flex flex-row gap-2 justify-center w-full relative">
           <div className={getQueryBarClassName()}>
             <div className="relative z-10">
@@ -124,6 +148,7 @@ const InputBox: React.FC<InputBoxProps> = ({
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder=""
+                disabled={isLoading}
               ></textarea>
             </div>
             
@@ -136,6 +161,7 @@ const InputBox: React.FC<InputBoxProps> = ({
                   type="button" 
                   aria-label="附件" 
                   tabIndex={0}
+                  disabled={isLoading}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-[2] text-[#e0e0e0]">
                     <path d="M10 9V15C10 16.1046 10.8954 17 12 17V17C13.1046 17 14 16.1046 14 15V7C14 4.79086 12.2091 3 10 3V3C7.79086 3 6 4.79086 6 7V15C6 18.3137 8.68629 21 12 21V21C15.3137 21 18 18.3137 18 15V8" stroke="currentColor"></path>
@@ -150,6 +176,7 @@ const InputBox: React.FC<InputBoxProps> = ({
                     tabIndex={0} 
                     aria-pressed="true" 
                     aria-label="DeepDebug"
+                    disabled={isLoading}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-[2] group-hover:text-white text-[#e0e0e0] flex-shrink-0">
@@ -167,17 +194,24 @@ const InputBox: React.FC<InputBoxProps> = ({
               <div className="ml-auto flex flex-row items-end gap-1">
                 <button 
                   className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium leading-[normal] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-9 rounded-full py-2 relative px-2 w-9 aspect-square ${
-                    hasContent 
+                    hasContent && !isLoading
                       ? 'bg-white border-white text-[#373737] hover:scale-110 hover:shadow-md cursor-pointer' 
                       : 'bg-[#373737] border-[#373737] text-white opacity-100 cursor-default pointer-events-none'
                   }`}
                   type="submit" 
                   aria-label="提交" 
-                  disabled={!hasContent}
+                  disabled={!hasContent || isLoading}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={`stroke-[2] ${hasContent ? 'text-black' : 'text-white'}`}>
-                    <path d="M5 11L12 4M12 4L19 11M12 4V21" stroke="currentColor"></path>
-                  </svg>
+                  {isLoading ? (
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={`stroke-[2] ${hasContent ? 'text-black' : 'text-white'}`}>
+                      <path d="M5 11L12 4M12 4L19 11M12 4V21" stroke="currentColor"></path>
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

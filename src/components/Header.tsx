@@ -1,30 +1,124 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import logo from '../assets/logo.png';
+
+// 定义模型类型接口
+export interface ModelOption {
+  name: string;
+  type: string;
+  displayName: string;
+}
 
 interface HeaderProps {
   onNewChat?: () => void;
   onSidebarToggle?: () => void;
   isSidebarOpen?: boolean;
   onLogoClick?: () => void;
+  selectedModel?: ModelOption;
+  onModelChange?: (model: ModelOption) => void;
 }
 
 /**
  * Header组件
  * 透明背景，左侧包含控制按钮，右侧包含logo
  */
-const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOpen, onLogoClick }) => {
-  const [selectedModel, setSelectedModel] = useState('GPT-4');
+const Header: React.FC<HeaderProps> = ({ 
+  onNewChat, 
+  onSidebarToggle, 
+  isSidebarOpen, 
+  onLogoClick,
+  selectedModel,
+  onModelChange 
+}) => {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const models = ['GPT-3.5', 'GPT-4', 'Claude', 'Gemini'];
+  const menuRef = useRef<HTMLDivElement>(null);
+  
+  // 定义可用的模型
+  const availableModels: ModelOption[] = [
+    { name: 'llama3', type: 'ollama', displayName: 'Llama 3' },
+    { name: 'qwen2.5-coder', type: 'ollama', displayName: 'Qwen 2.5 Coder' },
+    { name: 'gpt-4o', type: 'openai', displayName: 'GPT-4o' },
+    { name: 'claude-3-5-sonnet', type: 'anthropic', displayName: 'Claude 3.5' }
+  ];
+
+  // 使用传入的selectedModel，或者默认使用第一个模型
+  const currentModel = selectedModel || availableModels[0];
+
+  // 按类型分组模型
+  const modelsByType: {[key: string]: ModelOption[]} = availableModels.reduce((acc, model) => {
+    if (!acc[model.type]) {
+      acc[model.type] = [];
+    }
+    acc[model.type].push(model);
+    return acc;
+  }, {} as {[key: string]: ModelOption[]});
+
+  // 获取模型提供商显示名称
+  const getProviderName = (type: string): string => {
+    switch(type) {
+      case 'ollama': return 'Ollama';
+      case 'openai': return 'OpenAI';
+      case 'anthropic': return 'Anthropic';
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  // 获取模型提供商图标
+  const getProviderIcon = (type: string): React.ReactNode => {
+    switch(type) {
+      case 'ollama':
+        return (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-green-400">
+            <path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 11a5 5 0 110-10 5 5 0 010 10z" />
+            <path d="M8 4a4 4 0 100 8 4 4 0 000-8zm0 7a3 3 0 110-6 3 3 0 010 6z" />
+          </svg>
+        );
+      case 'openai':
+        return (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-blue-400">
+            <path d="M8 1.333A6.667 6.667 0 108 14.667 6.667 6.667 0 008 1.333zM8 13a5 5 0 110-10 5 5 0 010 10z" />
+            <path d="M11 8a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        );
+      case 'anthropic':
+        return (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-purple-400">
+            <path d="M4.5 2a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM11.5 2a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM8 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM4.5 11a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM11.5 11a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" />
+            <path d="M4.5 5.5L8 7l3.5-1.5M4.5 10.5L8 9l3.5 1.5" />
+          </svg>
+        );
+      default:
+        return (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-gray-400">
+            <path d="M8 2a6 6 0 100 12A6 6 0 008 2z" />
+          </svg>
+        );
+    }
+  };
 
   const toggleModelMenu = () => {
     setIsModelMenuOpen(!isModelMenuOpen);
   };
 
-  const selectModel = (model: string) => {
-    setSelectedModel(model);
+  const selectModel = (model: ModelOption) => {
+    if (onModelChange) {
+      onModelChange(model);
+    }
     setIsModelMenuOpen(false);
   };
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsModelMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // 处理新建聊天按钮点击
   const handleNewChat = () => {
@@ -51,7 +145,7 @@ const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOp
   return (
     <header className="w-full py-3 px-4 flex justify-between items-center bg-transparent z-50">
       {/* 左侧控制区域 */}
-      <div className="flex items-center">
+      <div className="flex items-center relative" ref={menuRef}>
         {/* 侧边栏按钮 - 仅在侧边栏关闭时显示 */}
         {!isSidebarOpen && (
           <button 
@@ -80,33 +174,68 @@ const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOp
 
         {/* 模型选择下拉菜单 */}
         <button 
-          aria-label={`模型选择器，当前模型为 ${selectedModel}`} 
+          aria-label={`模型选择器，当前模型为 ${currentModel.displayName}`} 
           type="button"
           className="group flex cursor-pointer items-center gap-1 rounded-lg py-1.5 px-3 text-lg hover:bg-[#424242] font-semibold text-white overflow-hidden whitespace-nowrap"
           onClick={toggleModelMenu}
         >
-          <div className="text-white">
-            ChatGPT <span className="text-white">{selectedModel}</span>
+          <div className="flex items-center gap-2">
+            {getProviderIcon(currentModel.type)}
+            <span className="text-white">{currentModel.displayName}</span>
           </div>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+          <svg 
+            width="20" 
+            height="20" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg" 
+            className={`text-white transform transition-transform duration-300 ${isModelMenuOpen ? 'rotate-180' : ''}`}
+          >
             <path fillRule="evenodd" clipRule="evenodd" d="M5.29289 9.29289C5.68342 8.90237 6.31658 8.90237 6.70711 9.29289L12 14.5858L17.2929 9.29289C17.6834 8.90237 18.3166 8.90237 18.7071 9.29289C19.0976 9.68342 19.0976 10.3166 18.7071 10.7071L12.7071 16.7071C12.5196 16.8946 12.2652 17 12 17C11.7348 17 11.4804 16.8946 11.2929 16.7071L5.29289 10.7071C4.90237 10.3166 4.90237 9.68342 5.29289 9.29289Z" fill="currentColor"></path>
           </svg>
         </button>
         
-        {/* 模型下拉菜单 */}
-        {isModelMenuOpen && (
-          <div className="absolute top-16 left-32 bg-gray-800 rounded-lg shadow-lg z-10">
-            {models.map(model => (
-              <div 
-                key={model}
-                className={`px-4 py-2 cursor-pointer hover:bg-[#424242] text-white ${selectedModel === model ? 'bg-[#424242]' : ''}`}
-                onClick={() => selectModel(model)}
-              >
-                {model}
-              </div>
-            ))}
+        {/* 模型下拉菜单 - 添加了动画和改进的样式 */}
+        <div 
+          className={`absolute top-14 left-0 overflow-hidden transition-all duration-300 ease-in-out transform origin-top-left z-10 ${
+            isModelMenuOpen 
+              ? 'opacity-100 scale-100 translate-y-2' 
+              : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+          }`}
+        >
+          <div className="bg-[#2D2D2D] border border-[#3D3D3D] rounded-xl shadow-xl w-72 overflow-hidden">
+            <div className="p-1">
+              {Object.keys(modelsByType).map((type, index) => (
+                <div key={type} className={index > 0 ? 'mt-1' : ''}>
+                  <div className="px-3 py-2 text-sm text-gray-400 font-medium flex items-center">
+                    {getProviderIcon(type)}
+                    <span className="ml-2">{getProviderName(type)}</span>
+                  </div>
+                  <div className="mb-1">
+                    {modelsByType[type].map(model => (
+                      <div 
+                        key={model.name}
+                        className={`flex items-center px-3 py-2 cursor-pointer rounded-lg mx-1 hover:bg-[#3D3D3D] text-white ${
+                          currentModel.name === model.name ? 'bg-[#3D3D3D]' : ''
+                        }`}
+                        onClick={() => selectModel(model)}
+                      >
+                        <div className="flex-1 flex items-center">
+                          <span className="ml-2">{model.displayName}</span>
+                        </div>
+                        {currentModel.name === model.name && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-400">
+                            <path d="M13.3334 4L6.00008 11.3333L2.66675 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 右侧Logo区域 - 修改为使用自定义点击处理函数 */}
@@ -123,4 +252,4 @@ const Header: React.FC<HeaderProps> = ({ onNewChat, onSidebarToggle, isSidebarOp
   );
 };
 
-export default Header; 
+export default Header;
