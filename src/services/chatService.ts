@@ -10,6 +10,7 @@ const API_BASE_URL = 'http://localhost:5002/api';
 export interface Message {
   role: string;
   content: string;
+  type?: 'text' | 'deepdebug';
 }
 
 // 模型信息类型定义

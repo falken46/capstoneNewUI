@@ -4,6 +4,7 @@ import BotMessage from './BotMessage';
 import InputBox from './InputBox';
 import { Message } from '../services/chatService';
 import { MessageStatus } from './BotMessage';
+import DeepDebugPanel from './DeepDebugPanel';
 
 interface ExpandedDialogLayoutProps {
   messages: Message[];
@@ -161,6 +162,31 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
       }
     };
   }, []);
+
+  // 根据消息类型渲染不同组件
+  const renderMessage = (msg: Message, index: number) => {
+    // 如果是DeepDebug类型的消息，渲染DeepDebugPanel
+    if (msg.type === 'deepdebug') {
+      return (
+        <div key={`debug-${index}`} className="w-full my-6">
+          <DeepDebugPanel className="w-full rounded-xl shadow-lg" />
+        </div>
+      );
+    }
+    
+    // 否则根据角色渲染普通消息
+    if (msg.role === 'user') {
+      return <UserMessage key={`user-${index}`} message={msg} />;
+    } else {
+      return (
+        <BotMessage 
+          key={`bot-${index}`} 
+          message={msg} 
+          status={index === messages.length - 1 && msg.role === 'assistant' ? botResponseStatus : 'complete'} 
+        />
+      );
+    }
+  };
   
   return (
     // 主容器：垂直flex布局，占满父容器高度
@@ -181,17 +207,7 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
         {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
         <div className="max-w-3xl mx-auto pt-4 pb-2"> 
           <div className="w-[95%] mx-auto">
-            {messages.map((msg, index) => (
-              msg.role === 'user' ? (
-                <UserMessage key={`user-${index}`} message={msg} />
-              ) : (
-                <BotMessage 
-                  key={`bot-${index}`} 
-                  message={msg} 
-                  status={index === messages.length - 1 && msg.role === 'assistant' ? botResponseStatus : 'complete'} 
-                />
-              )
-            ))}
+            {messages.map((msg, index) => renderMessage(msg, index))}
             {/* 添加一个空的div作为底部缓冲，防止最后一条消息紧贴输入框 */}
             <div className="h-4"></div>
           </div>

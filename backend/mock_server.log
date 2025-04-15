@@ -1,0 +1,48 @@
+INFO:__main__:配置 CORS: 允许所有源
+INFO:__main__:启动测试服务器: http://0.0.0.0:5002
+ * Serving Flask app 'check_cors'
+ * Debug mode: on
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5002
+ * Running on http://192.168.31.231:5002
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug: * Restarting with stat
+INFO:__main__:配置 CORS: 允许所有源
+INFO:__main__:启动测试服务器: http://0.0.0.0:5002
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 714-957-837
+DEBUG:__main__:请求头:
+DEBUG:__main__:  Host: localhost:5002
+DEBUG:__main__:  User-Agent: curl/8.7.1
+DEBUG:__main__:  Accept: */*
+DEBUG:__main__:请求方法: GET
+DEBUG:__main__:请求路径: /api/health
+DEBUG:__main__:请求参数: ImmutableMultiDict([])
+INFO:werkzeug:127.0.0.1 - - [14/Apr/2025 21:35:30] "GET /api/health HTTP/1.1" 200 -
+DEBUG:__main__:请求头:
+DEBUG:__main__:  Host: localhost:5002
+DEBUG:__main__:  User-Agent: curl/8.7.1
+DEBUG:__main__:  Accept: */*
+DEBUG:__main__:  Content-Type: application/json
+DEBUG:__main__:  Content-Length: 42
+DEBUG:__main__:请求方法: POST
+DEBUG:__main__:请求路径: /api/debug/workflow
+DEBUG:__main__:请求参数: ImmutableMultiDict([])
+DEBUG:__main__:请求JSON: {'content': 'test content', 'stream': False}
+INFO:__main__:收到调试工作流请求: content=test content..., stream=False
+INFO:werkzeug:127.0.0.1 - - [14/Apr/2025 21:35:30] "POST /api/debug/workflow HTTP/1.1" 200 -
+DEBUG:__main__:请求头:
+DEBUG:__main__:  Host: localhost:5002
+DEBUG:__main__:  User-Agent: curl/8.7.1
+DEBUG:__main__:  Content-Type: application/json
+DEBUG:__main__:  Accept: text/event-stream
+DEBUG:__main__:  Content-Length: 41
+DEBUG:__main__:请求方法: POST
+DEBUG:__main__:请求路径: /api/debug/workflow
+DEBUG:__main__:请求参数: ImmutableMultiDict([])
+DEBUG:__main__:请求JSON: {'content': 'test content', 'stream': True}
+INFO:__main__:收到调试工作流请求: content=test content..., stream=True
+INFO:werkzeug:127.0.0.1 - - [14/Apr/2025 21:35:30] "POST /api/debug/workflow HTTP/1.1" 200 -
+/Users/sunyucheng/miniconda3/lib/python3.12/multiprocessing/resource_tracker.py:255: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

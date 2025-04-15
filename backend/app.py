@@ -11,13 +11,14 @@ from flask_cors import CORS
 from config import Config
 from models.factory import ModelFactory
 from models.base import ModelInterface
+from workflows import run_workflow
 
 # 创建Flask应用
 app = Flask(__name__)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
 
 # 配置CORS
-CORS(app, resources={r"/*": {"origins": Config.CORS_ORIGINS}})
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
 # 模型实例缓存，避免重复创建
 model_instances: Dict[str, ModelInterface] = {}
@@ -164,6 +165,69 @@ def health_check():
         "status": "ok",
         "version": "1.0.0"
     })
+
+@app.route('/api/debug/workflow', methods=['POST'])
+def debug_workflow():
+    """调试工作流
+    
+    请求体:
+    {
+        "content": "代码或问题内容",
+        "stream": true, // 可选，默认为true
+        "model_type": "ollama", // 可选，用于LLM调用的模型类型
+        "model_name": "qwen2.5-coder" // 可选，用于LLM调用的模型名称
+    }
+    
+    响应:
+    - 非流式: 返回完整的工作流结果
+    - 流式: 使用SSE逐步返回工作流步骤的结果
+    """
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({"error": "请求体为空"}), 400
+        
+        if "content" not in data:   
+            return jsonify({"error": "content字段缺失"}), 400
+        
+        # 获取参数
+        content = data["content"]
+        model_type = data.get("model_type", Config.DEFAULT_MODEL_TYPE)
+        model_name = data.get("model_name")
+        stream = data.get("stream", True)  # 默认使用流式传输
+
+        # 获取模型实例
+        model = get_model(model_type, model_name)
+            
+        # 根据是否流式传输选择不同的处理方式
+        if stream:
+            # 使用Server-Sent Events进行流式传输
+            def generate():
+                try:
+                    for event_type, event_data in run_workflow(model, content, stream=True):
+                        # 直接传递简化后的事件和内容
+                        yield f"data: {json.dumps(event_data)}\n\n"
+                except Exception as e:
+                    error_msg = {"error": str(e), "event": "error", "content": str(e)}
+                    yield f"data: {json.dumps(error_msg)}\n\n"
+                yield "data: {\"event\": \"done\", \"content\": \"\"}\n\n"
+            
+            return Response(
+                stream_with_context(generate()),
+                content_type='text/event-stream'
+            )
+        else:
+            # 非流式处理，收集所有结果
+            results = []
+            for _, event_data in run_workflow(model, content, stream=False):
+                results.append(event_data)
+            
+            return jsonify({"results": results})
+    
+    except Exception as e:
+        app.logger.error(f"执行调试工作流时发生错误: {str(e)}")
+        return jsonify({"error": str(e), "event": "error", "content": str(e)}), 500
 
 
 if __name__ == '__main__':
