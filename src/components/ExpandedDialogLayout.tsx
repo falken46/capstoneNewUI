@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import UserMessage from './UserMessage';
+import BotMessage from './BotMessage';
 import InputBox from './InputBox';
-import CodeBlock from './CodeBlock';
+import { Message } from '../services/chatService';
+import { MessageStatus } from './BotMessage';
+import DeepDebugPanel from './DeepDebugPanel';
 
 interface ExpandedDialogLayoutProps {
-  messages: string[];
+  messages: Message[];
+  botResponseStatus: MessageStatus;
   inputValue: string;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -17,82 +21,271 @@ interface ExpandedDialogLayoutProps {
  */
 const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
   messages,
+  botResponseStatus,
   inputValue,
   onInputChange,
   onSubmit
 }) => {
-  // 检测是否为Python代码块
-  const isPythonCodeBlock = (message: string): boolean => {
-    // 检查消息是否包含Python代码
-    // 这里使用简单的启发式方法，可以根据需要调整
-    return (
-      message.includes('```python') || 
-      (message.includes('```') && 
-       (message.includes('def ') || 
-        message.includes('import ') || 
-        message.includes('print(') ||
-        message.includes('for ')))
-    );
-  };
-
-  // 从消息中提取Python代码
-  const extractPythonCode = (message: string): string => {
-    if (message.includes('```python')) {
-      const codeStart = message.indexOf('```python') + 9;
-      const codeEnd = message.indexOf('```', codeStart);
-      if (codeEnd > codeStart) {
-        return message.substring(codeStart, codeEnd).trim();
+  // 机器人是否正在回复
+  const isLoading = botResponseStatus === 'loading' || botResponseStatus === 'streaming';
+  // 引用聊天内容区域
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  // 跟踪上一次消息长度，只在消息数量变化或最后一条消息内容变化时滚动
+  const lastMessageRef = useRef<{content: string, count: number}>({content: '', count: 0});
+  // 跟踪是否正在滚动中，避免重复滚动
+  const isScrollingRef = useRef<boolean>(false);
+  // 跟踪防抖计时器
+  const scrollTimerRef = useRef<number | null>(null);
+  
+  // 添加DeepDebugPanel渲染防抖
+  const deepDebugTimerRef = useRef<number | null>(null);
+  const [shouldRenderDeepDebug, setShouldRenderDeepDebug] = React.useState<boolean>(false);
+  const hasDeepDebugMessageRef = useRef<boolean>(false);
+  
+  // 防抖滚动函数
+  const smoothScrollToBottom = useCallback(() => {
+    // 如果已经在滚动中或容器不存在，则不执行新的滚动
+    if (isScrollingRef.current || !chatContainerRef.current) return;
+    
+    // 设置滚动锁
+    isScrollingRef.current = true;
+    
+    // 清除之前的计时器
+    if (scrollTimerRef.current) {
+      window.clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = null;
+    }
+    
+    // 执行平滑滚动
+    try {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    } catch (error) {
+      // 如果平滑滚动失败，则回退到直接滚动
+      console.error('平滑滚动失败:', error);
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+    
+    // 滚动完成后释放锁
+    scrollTimerRef.current = window.setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 500); // 给滚动动画足够的时间完成
+  }, []);
+  
+  // 强制滚动到底部的函数（不使用平滑效果，立即滚动）
+  const forceScrollToBottom = useCallback(() => {
+    if (!chatContainerRef.current) return;
+    
+    const scrollHeight = chatContainerRef.current.scrollHeight;
+    chatContainerRef.current.scrollTop = scrollHeight;
+  }, []);
+  
+  // 检查消息中是否包含deepdebug类型，使用防抖处理
+  useEffect(() => {
+    // 检查当前消息列表中是否存在deepdebug类型的消息
+    const hasDeepDebugMessage = messages.some(msg => msg.type === 'deepdebug');
+    hasDeepDebugMessageRef.current = hasDeepDebugMessage;
+    
+    // 如果有deepdebug消息但尚未渲染，启动防抖
+    if (hasDeepDebugMessage && !shouldRenderDeepDebug) {
+      // 清除之前的计时器
+      if (deepDebugTimerRef.current) {
+        window.clearTimeout(deepDebugTimerRef.current);
       }
-    } else if (message.includes('```')) {
-      const codeStart = message.indexOf('```') + 3;
-      const codeEnd = message.indexOf('```', codeStart);
-      if (codeEnd > codeStart) {
-        return message.substring(codeStart, codeEnd).trim();
+      
+      // 设置防抖延迟，500ms后再渲染DeepDebugPanel
+      deepDebugTimerRef.current = window.setTimeout(() => {
+        console.log('防抖后渲染DeepDebugPanel');
+        setShouldRenderDeepDebug(true);
+        deepDebugTimerRef.current = null;
+      }, 500);
+    } 
+    // 如果不再有deepdebug消息但状态还是true，也添加防抖清除
+    else if (!hasDeepDebugMessage && shouldRenderDeepDebug) {
+      // 清除之前的计时器
+      if (deepDebugTimerRef.current) {
+        window.clearTimeout(deepDebugTimerRef.current);
+      }
+      
+      // 设置防抖延迟
+      deepDebugTimerRef.current = window.setTimeout(() => {
+        console.log('防抖后移除DeepDebugPanel');
+        setShouldRenderDeepDebug(false);
+        deepDebugTimerRef.current = null;
+      }, 500);
+    }
+    
+    // 组件卸载时清理计时器
+    return () => {
+      if (deepDebugTimerRef.current) {
+        window.clearTimeout(deepDebugTimerRef.current);
+        deepDebugTimerRef.current = null;
+      }
+    };
+  }, [messages, shouldRenderDeepDebug]);
+  
+  // 消息列表变化时根据条件滚动到底部
+  useEffect(() => {
+    // 获取当前消息信息
+    const currentMsgCount = messages.length;
+    const lastMessage = messages[currentMsgCount - 1];
+    const lastContent = lastMessage?.content || '';
+    
+    // 检查是否需要滚动
+    // 1. 消息数量变化时总是滚动
+    // 2. 最后一条是机器人消息且内容变化时滚动
+    // 3. 最后一条是用户消息且是新添加的消息时滚动
+    const shouldScroll = 
+      currentMsgCount !== lastMessageRef.current.count || // 消息数量变化
+      (lastMessage?.role === 'assistant' && lastContent !== lastMessageRef.current.content) || // 最后是机器人消息且内容变化
+      (lastMessage?.role === 'user' && currentMsgCount > lastMessageRef.current.count); // 新添加了用户消息
+    
+    // 更新引用的值
+    lastMessageRef.current = {
+      content: lastContent,
+      count: currentMsgCount
+    };
+    
+    if (shouldScroll) {
+      smoothScrollToBottom();
+    }
+  }, [messages, smoothScrollToBottom]);
+  
+  // 组件初次渲染和内容更新后执行滚动
+  useEffect(() => {
+    // 初始化滚动位置
+    forceScrollToBottom();
+    
+    // 使用MutationObserver监视消息变化
+    if (chatContainerRef.current) {
+      const observer = new MutationObserver(() => {
+        forceScrollToBottom();
+      });
+      
+      observer.observe(chatContainerRef.current, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      
+      return () => observer.disconnect();
+    }
+  }, [forceScrollToBottom]);
+  
+  // 机器人状态变化时也触发滚动（比如从loading变为streaming）
+  useEffect(() => {
+    if (messages.length > 0) {
+      // 无论状态如何变化，都尝试滚动
+      smoothScrollToBottom();
+      
+      // 对于流式响应，设置定期滚动
+      if (botResponseStatus === 'streaming') {
+        const intervalId = setInterval(forceScrollToBottom, 500);
+        return () => clearInterval(intervalId);
       }
     }
-    return message; // 如果没有明确的代码块标记，返回整个消息
+  }, [botResponseStatus, messages.length, smoothScrollToBottom, forceScrollToBottom]);
+  
+  // 当用户提交新消息时触发滚动
+  const handleSubmitWithScroll = (e: React.FormEvent) => {
+    onSubmit(e);
+    // 立即滚动一次
+    forceScrollToBottom();
+    // 延迟再滚动一次，确保消息已添加到DOM
+    setTimeout(() => {
+      smoothScrollToBottom();
+    }, 100);
   };
+  
+  // 使用备忘录缓存DeepDebugPanel，减少重新渲染
+  const deepDebugPanelMemo = useMemo(() => {
+    if (shouldRenderDeepDebug) {
+      return (
+        <div className="w-full my-6">
+          <DeepDebugPanel className="w-full rounded-xl shadow-lg" />
+        </div>
+      );
+    }
+    return null;
+  }, [shouldRenderDeepDebug]);
+  
+  // 组件卸载时清理计时器
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) {
+        window.clearTimeout(scrollTimerRef.current);
+      }
+      if (deepDebugTimerRef.current) {
+        window.clearTimeout(deepDebugTimerRef.current);
+      }
+    };
+  }, []);
 
+  // 根据消息类型渲染不同组件
+  const renderMessage = (msg: Message, index: number) => {
+    // 如果是DeepDebug类型的消息，返回null（实际渲染由useMemo处理）
+    if (msg.type === 'deepdebug') {
+      return null;
+    }
+    
+    // 否则根据角色渲染普通消息
+    if (msg.role === 'user') {
+      return <UserMessage key={`user-${index}`} message={msg} />;
+    } else {
+      return (
+        <BotMessage 
+          key={`bot-${index}`} 
+          message={msg} 
+          status={index === messages.length - 1 && msg.role === 'assistant' ? botResponseStatus : 'complete'} 
+        />
+      );
+    }
+  };
+  
   return (
     // 主容器：垂直flex布局，占满父容器高度
     <div className='flex flex-col h-full w-full'>
       
       {/* 聊天内容区域：自动增长以填充空间(flex-1)，最小高度为0，超出时垂直滚动 */}
-      <div className="flex-1 min-h-0 overflow-y-auto w-full">
+      <div 
+        ref={chatContainerRef} 
+        className="flex-1 min-h-0 overflow-y-auto w-full will-change-scroll scroll-smooth"
+        onScroll={() => {
+          // 用户手动滚动时阻止自动滚动干扰
+          if (chatContainerRef.current) {
+            const isAtBottom = chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop - chatContainerRef.current.clientHeight < 50;
+            isScrollingRef.current = !isAtBottom;
+          }
+        }}
+      >
         {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
-        <div className="w-4/5 max-w-3xl mx-auto pt-4 pb-2"> 
-          {messages.map((msg, index) => {
-            // 检测是否为Python代码块
-            if (isPythonCodeBlock(msg)) {
-              const code = extractPythonCode(msg);
-              return <CodeBlock key={index} code={code} />;
-            }
-            // 普通消息使用UserMessage组件
-            return <UserMessage key={index} message={msg} />;
-          })}
-          {/* 可选：添加一个空的div作为底部缓冲，防止最后一条消息紧贴输入框 */}
-          {/* <div className="h-4"></div> */}
+        <div className="max-w-3xl mx-auto pt-4 pb-2"> 
+          <div className="w-[95%] mx-auto">
+            {messages.map((msg, index) => renderMessage(msg, index))}
+            {/* 渲染DeepDebugPanel，只有当有deepdebug消息时显示 */}
+            {deepDebugPanelMemo}
+            {/* 添加一个空的div作为底部缓冲，防止最后一条消息紧贴输入框 */}
+            <div className="h-4"></div>
+          </div>
         </div>
       </div>
       
       {/* 输入框区域：固定在底部，不收缩 */}
       <div className="w-full bg-[#212121] flex-shrink-0">
          {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
-         <div className="w-4/5 max-w-3xl mx-auto py-4">
+         <div className="max-w-3xl mx-auto py-4">
           <InputBox 
             inputValue={inputValue}
             onInputChange={onInputChange}
-            onSubmit={onSubmit}
+            onSubmit={handleSubmitWithScroll}
             placeholder="继续输入您的问题..."
             layoutMode="expanded"
             containerClassName="w-full"
+            isLoading={isLoading}
           />
         </div>
-        {/* --- 诊断代码：用固定高度的 div 替换 InputBox --- */}
-        {/* <div className="h-20 bg-red-500 flex items-center justify-center text-white">
-          临时输入框占位符
-        </div> */}
-        {/* --- 诊断代码结束 --- */}
       </div>
 
     </div>

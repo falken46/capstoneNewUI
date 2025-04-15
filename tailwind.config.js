@@ -17,18 +17,20 @@ module.exports = {
         'svh': '100vh',
       },
       keyframes: {
-        slideIn: {
-          '0%': { transform: 'translateY(-10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
+        shine: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
         },
-        slideOut: {
-          '0%': { transform: 'translateY(0)', opacity: '1' },
-          '100%': { transform: 'translateY(-10px)', opacity: '0' },
+        bounce: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-4px)' },
         },
       },
       animation: {
-        slideIn: 'slideIn 0.3s ease-out forwards',
-        slideOut: 'slideOut 0.3s ease-out forwards',
+        shine: 'shine 5s linear infinite',
+        'dot-bounce-1': 'bounce 0.8s ease-in-out infinite',
+        'dot-bounce-2': 'bounce 0.8s ease-in-out 0.2s infinite',
+        'dot-bounce-3': 'bounce 0.8s ease-in-out 0.4s infinite',
       },
     },
   },
