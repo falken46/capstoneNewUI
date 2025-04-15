@@ -125,7 +125,31 @@ def run_workflow(
         "content": "✅ Debugging workflow completed successfully."
     }
 
-    yield "full_code", {
+    # ========== 步骤 7：流式发送完整代码 ==========
+    # 将完整代码按块流式发送
+    yield "step_started", {
+        "event": "full_code",
+        "content": ""
+    }
+    
+    if stream:
+        # 按空格分割代码而不是按行
+        code_chunks = fixed_code.replace("\n", " \n ").split(" ")
+        current_content = ""
+        for chunk in code_chunks:
+            time.sleep(0.04)  # 添加小延迟模拟真实的流式传输
+            current_content += chunk + " "
+            yield "step_progress", {
+                "event": "full_code",
+                "content": current_content
+            }
+    else:
+        yield "full_code_result", {
+            "event": "full_code",
+            "content": fixed_code
+        }
+    
+    yield "step_completed", {
         "event": "full_code",
         "content": fixed_code
     }

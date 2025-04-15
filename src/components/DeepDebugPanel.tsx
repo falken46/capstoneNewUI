@@ -435,12 +435,29 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
       
       {/* Full Code 展示 - 面板下方显示 */}
       {fullCodeStep && (
-        <div className="mb-4">
-          <div className="mb-2 flex items-center">
-            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="text-primary size-[22px] flex-shrink-0 mr-2" height="1.2em" width="1.2em" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8.293 6.293 2.586 12l5.707 5.707 1.414-1.414L5.414 12l4.293-4.293zm7.414 11.414L21.414 12l-5.707-5.707-1.414 1.414L18.586 12l-4.293 4.293z"></path>
-            </svg>
-            <span className="text-lg font-medium text-primary">Full Code</span>
+        <div className="mt-8">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center">
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="text-primary size-[22px] flex-shrink-0 mr-2" height="1.2em" width="1.2em" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.293 6.293 2.586 12l5.707 5.707 1.414-1.414L5.414 12l4.293-4.293zm7.414 11.414L21.414 12l-5.707-5.707-1.414 1.414L18.586 12l-4.293 4.293z"></path>
+              </svg>
+              <span className="text-lg font-medium text-primary">Full Code</span>
+            </div>
+            <button 
+              onClick={() => {
+                alert('打开代码编辑器');
+                // 在这里添加打开编辑器的逻辑
+              }}
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium leading-[normal] cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-default transition-colors duration-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 border border-gray-400 text-fg-secondary hover:text-fg-primary hover:bg-gray-400/50 rounded-md bg-surface-base px-3 py-1.5" 
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link mr-1">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              Open in Editor
+            </button>
           </div>
           <BotMessage
             message={{
@@ -449,7 +466,7 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
               type: 'text'
             }}
             status="complete"
-            className="rounded-2xl p-0"
+            className="rounded-2xl p-0 mb-4"
           />
         </div>
       )}
