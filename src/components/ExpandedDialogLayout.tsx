@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import UserMessage from './UserMessage';
-import BotMessage from './BotMessage';
+import BotMessage, { MessageStatus } from './BotMessage';
 import InputBox from './InputBox';
 import { Message } from '../services/chatService';
-import { MessageStatus } from './BotMessage';
 import DeepDebugPanel from './DeepDebugPanel';
 
 interface ExpandedDialogLayoutProps {
@@ -12,6 +11,12 @@ interface ExpandedDialogLayoutProps {
   inputValue: string;
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
+  isLoading?: boolean;
+  deepDebugActive?: boolean;
+  onDeepDebugActiveChange?: (isActive: boolean) => void;
+  activeDeepDebugId?: string;
+  modelType?: string;
+  modelName?: string;
 }
 
 /**
@@ -24,10 +29,16 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
   botResponseStatus,
   inputValue,
   onInputChange,
-  onSubmit
+  onSubmit,
+  isLoading: externalIsLoading,
+  deepDebugActive = false,
+  onDeepDebugActiveChange,
+  activeDeepDebugId,
+  modelType,
+  modelName
 }) => {
   // 机器人是否正在回复
-  const isLoading = botResponseStatus === 'loading' || botResponseStatus === 'streaming';
+  const isLoading = externalIsLoading !== undefined ? externalIsLoading : (botResponseStatus === 'loading' || botResponseStatus === 'streaming');
   // 引用聊天内容区域
   const chatContainerRef = useRef<HTMLDivElement>(null);
   // 跟踪上一次消息长度，只在消息数量变化或最后一条消息内容变化时滚动
@@ -37,41 +48,40 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
   // 跟踪防抖计时器
   const scrollTimerRef = useRef<number | null>(null);
   
-  // 添加DeepDebugPanel渲染防抖
-  const deepDebugTimerRef = useRef<number | null>(null);
-  const [shouldRenderDeepDebug, setShouldRenderDeepDebug] = React.useState<boolean>(false);
-  const hasDeepDebugMessageRef = useRef<boolean>(false);
-  
   // 防抖滚动函数
   const smoothScrollToBottom = useCallback(() => {
-    // 如果已经在滚动中或容器不存在，则不执行新的滚动
     if (isScrollingRef.current || !chatContainerRef.current) return;
     
-    // 设置滚动锁
     isScrollingRef.current = true;
     
     // 清除之前的计时器
     if (scrollTimerRef.current) {
       window.clearTimeout(scrollTimerRef.current);
-      scrollTimerRef.current = null;
     }
     
-    // 执行平滑滚动
-    try {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    } catch (error) {
-      // 如果平滑滚动失败，则回退到直接滚动
-      console.error('平滑滚动失败:', error);
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-    
-    // 滚动完成后释放锁
+    // 设置新的计时器，延迟滚动，减少频繁滚动
     scrollTimerRef.current = window.setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 500); // 给滚动动画足够的时间完成
+      if (chatContainerRef.current) {
+        // 强制滚动到底部
+        const scrollHeight = chatContainerRef.current.scrollHeight;
+        chatContainerRef.current.scrollTop = scrollHeight;
+        
+        // 再尝试使用平滑滚动（为了兼容性）
+        try {
+          chatContainerRef.current.scrollTo({
+            top: scrollHeight,
+            behavior: 'smooth'
+          });
+        } catch (error) {
+          console.error('平滑滚动失败:', error);
+        }
+        
+        // 重置滚动状态
+        setTimeout(() => {
+          isScrollingRef.current = false;
+        }, 300); // 滚动完成后重置状态
+      }
+    }, 10); // 缩短防抖时间，更快响应变化
   }, []);
   
   // 强制滚动到底部的函数（不使用平滑效果，立即滚动）
@@ -81,50 +91,6 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
     const scrollHeight = chatContainerRef.current.scrollHeight;
     chatContainerRef.current.scrollTop = scrollHeight;
   }, []);
-  
-  // 检查消息中是否包含deepdebug类型，使用防抖处理
-  useEffect(() => {
-    // 检查当前消息列表中是否存在deepdebug类型的消息
-    const hasDeepDebugMessage = messages.some(msg => msg.type === 'deepdebug');
-    hasDeepDebugMessageRef.current = hasDeepDebugMessage;
-    
-    // 如果有deepdebug消息但尚未渲染，启动防抖
-    if (hasDeepDebugMessage && !shouldRenderDeepDebug) {
-      // 清除之前的计时器
-      if (deepDebugTimerRef.current) {
-        window.clearTimeout(deepDebugTimerRef.current);
-      }
-      
-      // 设置防抖延迟，500ms后再渲染DeepDebugPanel
-      deepDebugTimerRef.current = window.setTimeout(() => {
-        console.log('防抖后渲染DeepDebugPanel');
-        setShouldRenderDeepDebug(true);
-        deepDebugTimerRef.current = null;
-      }, 500);
-    } 
-    // 如果不再有deepdebug消息但状态还是true，也添加防抖清除
-    else if (!hasDeepDebugMessage && shouldRenderDeepDebug) {
-      // 清除之前的计时器
-      if (deepDebugTimerRef.current) {
-        window.clearTimeout(deepDebugTimerRef.current);
-      }
-      
-      // 设置防抖延迟
-      deepDebugTimerRef.current = window.setTimeout(() => {
-        console.log('防抖后移除DeepDebugPanel');
-        setShouldRenderDeepDebug(false);
-        deepDebugTimerRef.current = null;
-      }, 500);
-    }
-    
-    // 组件卸载时清理计时器
-    return () => {
-      if (deepDebugTimerRef.current) {
-        window.clearTimeout(deepDebugTimerRef.current);
-        deepDebugTimerRef.current = null;
-      }
-    };
-  }, [messages, shouldRenderDeepDebug]);
   
   // 消息列表变化时根据条件滚动到底部
   useEffect(() => {
@@ -199,49 +165,95 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
     }, 100);
   };
   
-  // 使用备忘录缓存DeepDebugPanel，减少重新渲染
-  const deepDebugPanelMemo = useMemo(() => {
-    if (shouldRenderDeepDebug) {
-      return (
-        <div className="w-full my-6">
-          <DeepDebugPanel className="w-full rounded-xl shadow-lg" />
-        </div>
-      );
-    }
-    return null;
-  }, [shouldRenderDeepDebug]);
-  
   // 组件卸载时清理计时器
   useEffect(() => {
     return () => {
       if (scrollTimerRef.current) {
         window.clearTimeout(scrollTimerRef.current);
       }
-      if (deepDebugTimerRef.current) {
-        window.clearTimeout(deepDebugTimerRef.current);
-      }
     };
   }, []);
-
-  // 根据消息类型渲染不同组件
-  const renderMessage = (msg: Message, index: number) => {
-    // 如果是DeepDebug类型的消息，返回null（实际渲染由useMemo处理）
-    if (msg.type === 'deepdebug') {
-      return null;
+  
+  // 添加处理DeepDebugPanel的函数，接受保存的结果
+  const renderDeepDebugPanel = (content: string, message: Message) => {
+    // 提取sessionId和query
+    const sessionIdMatch = content.match(/sessionId="([^"]+)"/);
+    const queryMatch = content.match(/query="([^"]+)"/);
+    const idMatch = content.match(/id="([^"]+)"/);
+    
+    if (sessionIdMatch && queryMatch) {
+      const sessionId = sessionIdMatch[1];
+      const query = queryMatch[1];
+      const id = idMatch ? idMatch[1] : `deepdebug-${sessionId}`;
+      
+      // 如果消息中包含保存的结果，将其传递给DeepDebugPanel
+      if (message.deepDebugResults) {
+        console.log("渲染已保存的DeepDebug结果:", sessionId, "步骤数:", message.deepDebugResults.steps?.length);
+        return (
+          <DeepDebugPanel
+            id={id}
+            sessionId={sessionId}
+            query={query}
+            savedResults={message.deepDebugResults}
+            modelType={modelType}
+            modelName={modelName}
+          />
+        );
+      } else {
+        console.log("渲染新的DeepDebug面板:", sessionId);
+        // 没有保存的结果，正常渲染
+        return (
+          <DeepDebugPanel
+            id={id}
+            sessionId={sessionId}
+            query={query}
+            modelType={modelType}
+            modelName={modelName}
+          />
+        );
+      }
     }
     
-    // 否则根据角色渲染普通消息
+    // 如果没有匹配到必要的属性，返回原始内容
+    return content;
+  };
+
+  // 在原有的渲染消息内容的函数中添加对DeepDebugPanel的处理
+  const renderMessageContent = (message: Message) => {
+    // 处理DeepDebugPanel
+    if (message.isDeepDebug && message.content.includes('<DeepDebugPanel')) {
+      console.log("检测到DeepDebug消息:", message.isDeepDebug, message.deepDebugResults ? "有保存结果" : "无保存结果");
+      return renderDeepDebugPanel(message.content, message);
+    }
+    
+    // 处理普通消息
+    return message.content;
+  };
+  
+  // 修改renderMessage函数使用renderMessageContent
+  const renderMessage = (
+    msg: Message, 
+    botResponseStatus: MessageStatus,
+    modelType?: string,
+    modelName?: string,
+    activeDeepDebugId?: string
+  ) => {
     if (msg.role === 'user') {
-      return <UserMessage key={`user-${index}`} message={msg} />;
-    } else {
+      return <UserMessage message={msg.content} />;
+    } else if (msg.role === 'assistant') {
+      if (msg.isDeepDebug && msg.content.includes('<DeepDebugPanel')) {
+        // 使用我们的处理函数
+        return renderMessageContent(msg);
+      }
+      
       return (
         <BotMessage 
-          key={`bot-${index}`} 
           message={msg} 
-          status={index === messages.length - 1 && msg.role === 'assistant' ? botResponseStatus : 'complete'} 
+          status={botResponseStatus} 
         />
       );
     }
+    return null;
   };
   
   return (
@@ -263,9 +275,14 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
         {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
         <div className="max-w-3xl mx-auto pt-4 pb-2"> 
           <div className="w-[95%] mx-auto">
-            {messages.map((msg, index) => renderMessage(msg, index))}
-            {/* 渲染DeepDebugPanel，只有当有deepdebug消息时显示 */}
-            {deepDebugPanelMemo}
+            {messages.map((msg, index) => {
+              const key = `message-${index}-${msg.role}`;
+              return (
+                <div key={key}>
+                  {renderMessage(msg, index === messages.length - 1 && msg.role === 'assistant' ? botResponseStatus : 'complete', modelType, modelName, activeDeepDebugId)}
+                </div>
+              );
+            })}
             {/* 添加一个空的div作为底部缓冲，防止最后一条消息紧贴输入框 */}
             <div className="h-4"></div>
           </div>
@@ -284,6 +301,8 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
             layoutMode="expanded"
             containerClassName="w-full"
             isLoading={isLoading}
+            deepDebugActive={deepDebugActive}
+            onDeepDebugActiveChange={onDeepDebugActiveChange}
           />
         </div>
       </div>

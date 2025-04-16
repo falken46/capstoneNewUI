@@ -6,6 +6,8 @@ import VariableProximity from './VariableProximity';
 interface CompactDialogLayoutProps {
   onSubmit: (inputValue: string) => void;
   isLoading?: boolean;
+  deepDebugActive?: boolean;
+  onDeepDebugActiveChange?: (isActive: boolean) => void;
 }
 
 /**
@@ -13,7 +15,12 @@ interface CompactDialogLayoutProps {
  * 显示在聊天界面中间，包含欢迎语和快捷操作按钮
  * 输入框宽度占满全宽
  */
-const CompactDialogLayout: React.FC<CompactDialogLayoutProps> = ({ onSubmit, isLoading = false }) => {
+const CompactDialogLayout: React.FC<CompactDialogLayoutProps> = ({ 
+  onSubmit, 
+  isLoading = false,
+  deepDebugActive = false,
+  onDeepDebugActiveChange
+}) => {
   const [inputValue, setInputValue] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputBoxRef = useRef<HTMLDivElement>(null);
@@ -163,6 +170,8 @@ const CompactDialogLayout: React.FC<CompactDialogLayoutProps> = ({ onSubmit, isL
             containerClassName="w-full"
             isLoading={isLoading}
             textareaRef={textareaRef}
+            deepDebugActive={deepDebugActive}
+            onDeepDebugActiveChange={onDeepDebugActiveChange}
           />
         </div>
       </div>

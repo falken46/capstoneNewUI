@@ -1,103 +1,150 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useDeepDebug } from '../contexts/DeepDebugContext';
+import React, { useRef, useState, useEffect } from 'react';
+import { Message, sendDebugWorkflow } from '../services/chatService';
 import BotMessage from './BotMessage';
-import { Message } from '../services/chatService';
 
-interface DeepDebugPanelProps {
-  className?: string;
+// 工作流步骤接口
+interface WorkflowStep {
+  id: string;
+  title: string;
+  content: string;
+  status: 'in_progress' | 'completed' | 'error';
 }
 
-/**
- * DeepDebug分析面板组件
- * 展示AI的思考和分析过程
- */
-const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
-  // 使用Context获取工作流数据
-  const { 
-    workflowSteps, 
-    workflowStatus,
-    isDeepDebugEnabled
-  } = useDeepDebug();
+// 工作流状态接口
+interface WorkflowStatus {
+  status: 'idle' | 'running' | 'completed' | 'error';
+  error?: string;
+}
+
+// DeepDebugPanel props接口
+interface DeepDebugPanelProps {
+  className?: string;
+  id?: string;
+  sessionId?: string;
+  query?: string;
+  modelType?: string;
+  modelName?: string;
+  savedResults?: {
+    steps: Array<{
+      id: string;
+      title: string;
+      content: string;
+      status: 'in_progress' | 'completed' | 'error';
+    }>;
+    fullCodeStep?: {
+      id: string;
+      title: string;
+      content: string;
+      status: 'in_progress' | 'completed' | 'error';
+    } | null;
+    elapsedTime: string;
+    status: 'idle' | 'running' | 'completed' | 'error';
+    error?: string;
+    query: string;
+  };
+}
+
+// 高亮样式
+const highlightStyles = `
+  .highlight-step\:bg-surface-hover {
+    transition: background-color 0.3s ease;
+  }
+  .highlight-step\:bg-surface-hover:target {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+`;
+
+
+const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ 
+  className = '',
+  id,
+  sessionId,
+  query,
+  modelType,
+  modelName,
+  savedResults
+}) => {
+  // 状态管理
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>(
+    savedResults ? { status: savedResults.status, error: savedResults.error } : { status: 'idle' }
+  );
+  const [elapsedTimeString, setElapsedTimeString] = useState<string>(savedResults?.elapsedTime || '00:00');
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [filteredWorkflowSteps, setFilteredWorkflowSteps] = useState<WorkflowStep[]>(
+    savedResults?.steps || []
+  );
+  const [fullCodeStep, setFullCodeStep] = useState<WorkflowStep | null>(
+    savedResults?.fullCodeStep || null
+  );
+  const [statusLabel, setStatusLabel] = useState<string>(
+    savedResults?.status === 'completed' ? 'DeepDebug' : 
+    savedResults?.status === 'error' ? 'Error' : 'Debugging'
+  );
   
-  // 引用右侧内容区的滚动容器
+  // refs
   const contentContainerRef = useRef<HTMLDivElement>(null);
-  
-  // 滚动锁，防止滚动冲突
-  const isScrollingRef = useRef<boolean>(false);
-  
-  // 本地计时器状态
-  const [localElapsedTime, setLocalElapsedTime] = React.useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isScrollingRef = useRef<boolean>(false);
+  const resultsLoadedRef = useRef<boolean>(!!savedResults);
   
-  // 本地计时器逻辑
+  // 记录初始化日志
   useEffect(() => {
-    // 当工作流状态为运行中时，启动计时器
-    if (workflowStatus.status === 'running') {
-      // 初始化本地计时器
-      setLocalElapsedTime(workflowStatus.elapsedTime || 0);
-      
-      // 每秒递增计时
-      timerRef.current = setInterval(() => {
-        setLocalElapsedTime(prev => prev + 1);
-      }, 1000);
+    if (savedResults) {
+      console.log("DeepDebugPanel初始化从保存的结果:", 
+        id, 
+        "步骤数:", savedResults.steps?.length,
+        "状态:", savedResults.status
+      );
     } else {
-      // 如果不是运行状态，清除计时器
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      console.log("DeepDebugPanel初始化为新面板:", id);
     }
+  }, [id, savedResults]);
+
+  // 设置标题，如果提供了query，则显示其信息
+  useEffect(() => {
+    if (workflowStatus.status === 'completed') {
+      setStatusLabel('DeepDebug');
+    } else if (workflowStatus.status === 'error') {
+      setStatusLabel('Error');
+    } else {
+      setStatusLabel('Debugging');
+    }
+  }, [workflowStatus.status]);
+
+  // 定时器，用于计算经过的时间
+  useEffect(() => {
+    // 如果有保存的结果，不需要启动计时器
+    if (resultsLoadedRef.current) return;
     
-    // 组件卸载时清除计时器
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [workflowStatus.status, workflowStatus.elapsedTime]);
-  
-  // 重新计算为时间字符串，优先使用本地计时器时间
-  const elapsedTimeString = useMemo(() => {
-    // 使用本地计时器的值
-    return `${localElapsedTime}s`;
-  }, [localElapsedTime]);
-  
-  // 过滤掉标题为 "full code" 的步骤
-  const filteredWorkflowSteps = useMemo(() => {
-    return workflowSteps.filter(step => step.title?.toLowerCase() !== 'full code');
-  }, [workflowSteps]);
-  
-  // 查找 full code 步骤
-  const fullCodeStep = useMemo(() => {
-    return workflowSteps.find(step => step.title?.toLowerCase() === 'full code');
-  }, [workflowSteps]);
-  
-  // 状态变化时更新日志
-  useEffect(() => {
-    console.log('DeepDebugPanel状态更新:', { 
-      isDeepDebugEnabled,
-      workflowStepsCount: workflowSteps.length,
-      workflowStatus: {
-        status: workflowStatus.status,
-        progress: workflowStatus.progress,
-        elapsedTime: workflowStatus.elapsedTime,
-        sourceCount: workflowStatus.sourceCount
-      }
-    });
-  }, [isDeepDebugEnabled, workflowStatus]);
-  
-  // 当工作流步骤更新时记录日志
-  useEffect(() => {
-    if (filteredWorkflowSteps.length > 0) {
-      console.log(`工作流步骤更新: 当前共${filteredWorkflowSteps.length}个步骤`);
-      filteredWorkflowSteps.forEach((step, index) => {
-        console.log(`步骤 ${index+1}: ${step.id} - ${step.title} (${step.status})`);
-      });
+    // 只有在运行状态下才更新计时器
+    if (workflowStatus.status === 'running' && startTime) {
+      timerRef.current = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+        setElapsedTimeString(`${minutes}:${seconds}`);
+      }, 1000);
+      
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
     }
-  }, [filteredWorkflowSteps]);
+  }, [workflowStatus.status, startTime]);
   
-  // 当步骤更新时，滚动到底部
+  // 启动调试工作流
+  useEffect(() => {
+    // 如果有保存的结果，不需要启动工作流
+    if (resultsLoadedRef.current) return;
+    
+    if (query && workflowStatus.status === 'idle') {
+      startDebugWorkflow(query);
+    }
+  }, [query, workflowStatus.status]);
+
+  // 添加自动滚动到底部的逻辑
   useEffect(() => {
     // 如果已经在滚动中，则不执行新的滚动
     if (isScrollingRef.current || !contentContainerRef.current || filteredWorkflowSteps.length === 0) return;
@@ -116,116 +163,223 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
       isScrollingRef.current = false;
     }, 500); // 给滚动动画足够的时间完成
   }, [filteredWorkflowSteps]);
+
+  // 更新或添加步骤的工具函数
+  const updateOrAddStep = (stepId: string, content: string = '', status: WorkflowStep['status'] = 'in_progress') => {
+    
+    // 特殊处理full_code步骤
+    if (stepId === 'Full Code') {
+      setFullCodeStep(prev => {
+        if (!prev) {
+          return {
+            id: stepId,
+            title: stepId,
+            content: content,
+            status: status
+          };
+        }
+        return { ...prev, content, status };
+      });
+      return;
+    }
+    
+    // 处理普通步骤
+    setFilteredWorkflowSteps(prev => {
+      // 检查步骤是否已存在
+      const existingStepIndex = prev.findIndex(step => step.id === stepId);
+      
+      if (existingStepIndex >= 0) {
+        // 更新现有步骤
+        return prev.map((step, index) => 
+          index === existingStepIndex ? { ...step, content, status } : step
+        );
+      } else {
+        // 添加新步骤
+        return [...prev, {
+          id: stepId,
+          title: stepId,
+          content,
+          status
+        }];
+      }
+    });
+  };
+
+  // 启动调试工作流函数
+  const startDebugWorkflow = (content: string) => {
+    // 重置状态
+    setWorkflowStatus({ status: 'running' });
+    setFilteredWorkflowSteps([]);
+    setFullCodeStep(null);
+    setStartTime(Date.now());
+    
+    // 调用后端API
+    sendDebugWorkflow(
+      content,
+      modelType,
+      modelName,
+      // 步骤开始回调
+      (event) => {
+        console.log("步骤开始事件:", event);
+        // 提取基础步骤ID并添加新步骤
+        updateOrAddStep(event, '', 'in_progress');
+      },
+      // 步骤进度回调
+      (event, content) => {
+        console.log("步骤进度事件:", event, "内容长度:", content?.length);
+        // 提取基础步骤ID并更新步骤内容
+        updateOrAddStep(event, content, 'in_progress');
+      },
+      // 步骤完成回调
+      (event, content) => {
+        console.log("步骤完成事件:", event, "内容长度:", content?.length);
+        // 提取基础步骤ID并更新步骤为完成状态
+        updateOrAddStep(event, content, 'completed');
+      },
+      // 步骤错误回调
+      (event, error) => {
+        console.log("步骤错误事件:", event, "错误:", error);
+        // 提取基础步骤ID并更新步骤为错误状态
+        updateOrAddStep(event, error, 'error');
+      },
+      // 完成回调
+      () => {
+        setWorkflowStatus({ status: 'completed' });
+        
+        // 清除定时器
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+
+        // 使用setTimeout确保状态已更新后再发送事件
+        setTimeout(() => {
+          // 通过最新的状态引用获取当前值
+          setFilteredWorkflowSteps(currentSteps => {
+            // 获取最新的全代码步骤
+            setFullCodeStep(currentFullCodeStep => {
+              // 在获取最新状态后立即发送事件
+              const event = new CustomEvent('deepdebug-workflow-complete', {
+                detail: { 
+                  sessionId: sessionId,
+                  status: 'completed',
+                  results: {
+                    steps: currentSteps, // 使用最新的步骤
+                    fullCodeStep: currentFullCodeStep, // 使用最新的全代码步骤
+                    elapsedTime: elapsedTimeString,
+                    status: 'completed',
+                    query: query || ''
+                  }
+                }
+              });
+              window.dispatchEvent(event);
+              console.log("发送工作流完成事件:", {
+                sessionId,
+                steps: currentSteps.length,
+                fullCodeStep: !!currentFullCodeStep,
+                elapsedTime: elapsedTimeString
+              });
+              
+              // 返回原始状态，不做修改
+              return currentFullCodeStep;
+            });
+            
+            // 返回原始状态，不做修改
+            return currentSteps;
+          });
+        }, 100); // 给React足够的时间更新状态
+      },
+      // 错误回调
+      (error) => {
+        setWorkflowStatus({ 
+          status: 'error',
+          error: typeof error === 'string' ? error : '调试过程中发生错误'
+        });
+        
+        // 清除定时器
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+
+        // 使用setTimeout确保状态已更新后再发送事件
+        setTimeout(() => {
+          // 通过最新的状态引用获取当前值
+          setFilteredWorkflowSteps(currentSteps => {
+            // 获取最新的全代码步骤
+            setFullCodeStep(currentFullCodeStep => {
+              // 在获取最新状态后立即发送事件
+              const event = new CustomEvent('deepdebug-workflow-complete', {
+                detail: { 
+                  sessionId: sessionId,
+                  status: 'error',
+                  results: {
+                    steps: currentSteps, // 使用最新的步骤
+                    fullCodeStep: currentFullCodeStep, // 使用最新的全代码步骤
+                    elapsedTime: elapsedTimeString,
+                    status: 'error',
+                    error: typeof error === 'string' ? error : '调试过程中发生错误',
+                    query: query || ''
+                  }
+                }
+              });
+              window.dispatchEvent(event);
+              console.log("发送工作流错误事件:", {
+                sessionId,
+                steps: currentSteps.length,
+                fullCodeStep: !!currentFullCodeStep,
+                error: typeof error === 'string' ? error : '调试过程中发生错误'
+              });
+              
+              // 返回原始状态，不做修改
+              return currentFullCodeStep;
+            });
+            
+            // 返回原始状态，不做修改
+            return currentSteps;
+          });
+        }, 100); // 给React足够的时间更新状态
+      }
+    );
+  };
   
-  // 添加自定义高亮效果的样式
-  const highlightStyles = `
-    @keyframes highlight {
-      0% { background-color: rgba(255, 255, 255, 0.05); }
-      50% { background-color: rgba(255, 255, 255, 0.1); }
-      100% { background-color: transparent; }
-    }
-    
-    .highlight-step {
-      animation: highlight 2s ease-out;
-      position: relative;
-    }
-    
-    .highlight-step::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      border-left: 3px solid rgba(255, 255, 255, 0.3);
-      pointer-events: none;
-      animation: border-fade 2s ease-out;
-    }
-    
-    @keyframes border-fade {
-      0% { border-left-color: rgba(255, 255, 255, 0.5); }
-      100% { border-left-color: transparent; }
-    }
-  `;
-  
-  // 处理步骤点击 - 滚动到右侧对应位置并添加视觉反馈
+  // 处理步骤点击
   const handleStepClick = (stepId: string) => {
-    console.log('点击步骤:', stepId);
-    
-    // 使用querySelectorAll找到所有匹配的元素 - 以防有多个相同ID的面板
-    const stepElements = document.querySelectorAll(`[data-step-id="${stepId}"]`);
-    const containerElements = document.querySelectorAll(`[data-step-container="${stepId}"]`);
-    
-    if (stepElements.length > 0 && contentContainerRef.current) {
-      // 获取第一个元素用于滚动
-      const firstElement = stepElements[0] as HTMLElement;
-      
-      // 设置滚动锁，防止自动滚动干扰
-      isScrollingRef.current = true;
-      
-      // 使用scrollTo以便更精确控制滚动位置
+    // 滚动到相应内容
+    const targetElement = document.getElementById(`step-${stepId}`);
+    if (targetElement && contentContainerRef.current) {
       contentContainerRef.current.scrollTo({
-        top: firstElement.offsetTop - 20, // 添加一些顶部边距
+        top: targetElement.offsetTop - 20,
         behavior: 'smooth'
       });
       
-      // 对所有匹配元素应用高亮效果
-      const allElements = [...Array.from(stepElements), ...Array.from(containerElements)];
-      allElements.forEach(el => {
-        // 先移除可能存在的高亮，避免重复叠加动画效果
-        el.classList.remove('highlight-step');
-        
-        // 触发重排，确保动画能够重新开始
-        void (el as HTMLElement).offsetWidth;
-        
-        // 添加高亮效果
-        el.classList.add('highlight-step');
-        
-        // 一段时间后移除高亮
-        setTimeout(() => {
-          el.classList.remove('highlight-step');
-        }, 2000);
-      });
+      // 添加高亮效果
+      targetElement.classList.add('highlight-step:bg-surface-hover');
       
-      // 延迟释放滚动锁，给足够时间完成滚动
+      // 移除高亮效果
       setTimeout(() => {
-        isScrollingRef.current = false;
-      }, 800); // 比高亮时间短，但比基本滚动时间长
+        targetElement.classList.remove('highlight-step:bg-surface-hover');
+      }, 2000);
     }
   };
   
-  // 获取进度条百分比值
-  const progressPercent = useMemo(() => {
-    return Math.max(0, Math.min(100, workflowStatus.progress || 0));
-  }, [workflowStatus.progress]);
-  
-  // 获取状态标签文本
-  const statusLabel = useMemo(() => {
-    switch(workflowStatus.status) {
-      case 'completed': return 'DeepDebug';
-      case 'error': return 'Error';
-      case 'running':
-      default: return 'Debugging';
-    }
-  }, [workflowStatus.status]);
-  
-  // 处理底部滚动按钮点击
+  // 处理滚动按钮点击
   const handleScrollButtonClick = () => {
-    if (!contentContainerRef.current) return;
-    
-    // 设置滚动锁
-    isScrollingRef.current = true;
-    
-    // 滚动到底部
-    contentContainerRef.current.scrollTo({
-      top: contentContainerRef.current.scrollHeight,
-      behavior: 'smooth'
-    });
-    
-    // 滚动完成后释放锁
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 500);
+    if (contentContainerRef.current) {
+      if (contentContainerRef.current.scrollTop > 0) {
+        // 如果已经滚动，则返回顶部
+        contentContainerRef.current.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      } else {
+        // 如果在顶部，则滚动到底部
+        contentContainerRef.current.scrollTo({
+          top: contentContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
   };
   
   return (
@@ -278,6 +432,11 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
+                            ) : step.status === 'error' ? (
+                              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="text-red-500 size-[22px] flex-shrink-0" height="1.2em" width="1.2em" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11.953 2C6.465 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.493 2 11.953 2zM12 20c-4.411 0-8-3.589-8-8s3.567-8 7.953-8C16.391 4 20 7.589 20 12s-3.589 8-8 8z"></path>
+                                <path d="M11 7h2v7h-2zm0 8h2v2h-2z"></path>
+                              </svg>
                             ) : (
                               <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 256 256" className="text-primary size-[22px] flex-shrink-0" height="1.2em" width="1.2em" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z"></path>
@@ -303,7 +462,7 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                         </div>
                         <div className="flex items-center text-white">
                           <div className="text-sm text-primary font-medium max-w-full leading-6">
-                            initalizing...
+                            初始化中...
                           </div>
                         </div>
                       </div>
@@ -367,8 +526,7 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                         
                         const message: Message = {
                           role: 'assistant',
-                          content: content,
-                          type: 'text'
+                          content: content
                         };
                         
                         return (
@@ -384,6 +542,13 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                               <span className="text-primary text-lg mr-2">
                                 {step.title}
                               </span>
+                              {step.status === 'in_progress' && (
+                                <div className="ml-2 flex-shrink-0 flex items-center space-x-1 h-5">
+                                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-dot-bounce-1"></div>
+                                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-dot-bounce-2"></div>
+                                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-dot-bounce-3"></div>
+                                </div>
+                              )}
                             </div>
                             <BotMessage 
                               message={message}
@@ -397,10 +562,10 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                     ) : (
                       <div className="flex flex-col gap-1 mt-1 px-6 pt-5">
                         <div className="text-md text-primary font-medium">
-                          initalizing...
+                          初始化中...
                         </div>
                         <div className="text-sm text-secondary mt-2">
-                          DeepDebug is ready...
+                          DeepDebug 准备就绪...
                         </div>
                         <div className="flex items-center justify-center py-10">
                           {/* 空内容 */}
@@ -441,7 +606,7 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
               <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="text-primary size-[22px] flex-shrink-0 mr-2" height="1.2em" width="1.2em" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8.293 6.293 2.586 12l5.707 5.707 1.414-1.414L5.414 12l4.293-4.293zm7.414 11.414L21.414 12l-5.707-5.707-1.414 1.414L18.586 12l-4.293 4.293z"></path>
               </svg>
-              <span className="text-lg font-medium text-primary">Full Code</span>
+              <span className="text-lg font-medium text-primary">完整代码</span>
             </div>
             <button 
               onClick={() => {
@@ -456,16 +621,15 @@ const DeepDebugPanel: React.FC<DeepDebugPanelProps> = ({ className = '' }) => {
                 <polyline points="15 3 21 3 21 9"></polyline>
                 <line x1="10" y1="14" x2="21" y2="3"></line>
               </svg>
-              Open in Editor
+              在编辑器中打开
             </button>
           </div>
           <BotMessage
             message={{
               role: 'assistant',
-              content: fullCodeStep.content,
-              type: 'text'
+              content: fullCodeStep.content
             }}
-            status="complete"
+            status={fullCodeStep.status === 'in_progress' ? 'streaming' : 'complete'}
             className="rounded-2xl p-0 mb-4"
           />
         </div>
