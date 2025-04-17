@@ -10,6 +10,7 @@ import AnimatedContent from './AnimatedContent';
 import { Message, sendChatMessage, saveChatHistory, getChatDetail } from '../services/chatService';
 import { MessageStatus } from './BotMessage';
 import DeepDebugPanel from './DeepDebugPanel';
+import CanvasMode from './CanvasMode'; // 导入Canvas模式组件
 
 /**
  * 聊天界面组件
@@ -59,6 +60,10 @@ const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   // 添加聊天列表刷新标志
   const [shouldRefreshChatList, setShouldRefreshChatList] = useState(0);
+  // 添加Canvas模式状态
+  const [isCanvasMode, setIsCanvasMode] = useState(false);
+  // 添加一个新状态来存储当前选择的代码片段
+  const [selectedCodeSnippet, setSelectedCodeSnippet] = useState<{code: string, language: string} | null>(null);
 
   // 刷新聊天列表的方法
   const triggerChatListRefresh = () => {
@@ -76,6 +81,22 @@ const ChatInterface: React.FC = () => {
   // 处理DeepDebug状态变更
   const handleDeepDebugActiveChange = (isActive: boolean) => {
     setDeepDebugActive(isActive);
+  };
+
+  // 处理Canvas模式切换
+  const handleCanvasModeToggle = (code?: string, language?: string) => {
+    if (code && language) {
+      // 如果提供了代码和语言，说明是从特定代码片段点击的
+      setSelectedCodeSnippet({ code, language });
+      setIsCanvasMode(true);
+    } else {
+      // 如果没有提供代码和语言，则是普通的切换操作
+      if (isCanvasMode) {
+        // 退出Canvas模式时清空选中的代码片段
+        setSelectedCodeSnippet(null);
+      }
+      setIsCanvasMode(!isCanvasMode);
+    }
   };
 
   // 从URL加载聊天记录
@@ -442,6 +463,8 @@ const ChatInterface: React.FC = () => {
             onLogoClick={handleLogoClick}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
+            isCanvasMode={isCanvasMode}
+            onCanvasModeToggle={handleCanvasModeToggle}
           />
         </FadeContent>
         
@@ -451,46 +474,84 @@ const ChatInterface: React.FC = () => {
           </div>
         ) : (
           /* 聊天内容区域 - 为不同模式分别应用动画 */
-          <div className="flex-1 overflow-y-auto relative min-h-0"> 
-            {/* 包裹 Compact Layout */}
-            <AnimatedContent 
-              show={showPage && layoutMode === 'compact'}
-              direction="down" 
-              distance={100} 
-              duration={animationDuration} // Use state for duration
-              className="h-full w-full" 
-            >
-              <CompactDialogLayout 
-                onSubmit={handleCompactSubmit} 
-                isLoading={isLoadingResponse}
-                deepDebugActive={deepDebugActive}
-                onDeepDebugActiveChange={handleDeepDebugActiveChange}
-              />
-            </AnimatedContent>
+          <div className="flex-1 flex overflow-hidden relative min-h-0"> 
+            {/* Canvas模式下的分屏布局 */}
+            {isCanvasMode ? (
+              <>
+                {/* 左侧聊天区域 - 占40% */}
+                <div className="w-2/5 h-full border-r border-[#333] overflow-hidden flex flex-col">
+                  <div className="flex-1 overflow-y-auto relative min-h-0">
+                    <ExpandedDialogLayout 
+                      messages={chatHistory}
+                      onSubmit={handleSubmit}
+                      onInputChange={handleInputChange}
+                      inputValue={inputMessage}
+                      isLoading={isLoadingResponse}
+                      deepDebugActive={deepDebugActive}
+                      onDeepDebugActiveChange={handleDeepDebugActiveChange}
+                      botResponseStatus={botResponseStatus}
+                      activeDeepDebugId={activeDeepDebugId}
+                      modelType={selectedModel.type}
+                      modelName={selectedModel.name}
+                      onCanvasModeToggle={handleCanvasModeToggle}
+                    />
+                  </div>
+                </div>
 
-            {/* 包裹 Expanded Layout */}
-            <AnimatedContent 
-              show={layoutMode === 'expanded'} 
-              direction="down" // Enter from top (fade in down)
-              distance={100} 
-              duration={animationDuration} // Use state for duration
-              delay={100} // Delay based on transition duration (400ms)
-              className="h-full w-full" 
-            >
-              <ExpandedDialogLayout 
-                messages={chatHistory}
-                onSubmit={handleSubmit}
-                onInputChange={handleInputChange}
-                inputValue={inputMessage}
-                isLoading={isLoadingResponse}
-                deepDebugActive={deepDebugActive}
-                onDeepDebugActiveChange={handleDeepDebugActiveChange}
-                botResponseStatus={botResponseStatus}
-                activeDeepDebugId={activeDeepDebugId}
-                modelType={selectedModel.type}
-                modelName={selectedModel.name}
-              />
-            </AnimatedContent>
+                {/* 右侧画布区域 - 占60% */}
+                <div className="w-3/5 h-full overflow-hidden">
+                  <CanvasMode 
+                    messages={chatHistory}
+                    className="h-full"
+                    onCanvasModeToggle={handleCanvasModeToggle}
+                    selectedCodeSnippet={selectedCodeSnippet}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 包裹 Compact Layout */}
+                <AnimatedContent 
+                  show={showPage && layoutMode === 'compact'}
+                  direction="down" 
+                  distance={100} 
+                  duration={animationDuration} // Use state for duration
+                  className="h-full w-full" 
+                >
+                  <CompactDialogLayout 
+                    onSubmit={handleCompactSubmit} 
+                    isLoading={isLoadingResponse}
+                    deepDebugActive={deepDebugActive}
+                    onDeepDebugActiveChange={handleDeepDebugActiveChange}
+                  />
+                </AnimatedContent>
+
+                {/* 包裹 Expanded Layout */}
+                <AnimatedContent 
+                  show={layoutMode === 'expanded'} 
+                  direction="down" // Enter from top (fade in down)
+                  distance={100} 
+                  duration={animationDuration} // Use state for duration
+                  delay={100} // Delay based on transition duration (400ms)
+                  className="h-full w-full" 
+                >
+                  <ExpandedDialogLayout 
+                    messages={chatHistory}
+                    onSubmit={handleSubmit}
+                    onInputChange={handleInputChange}
+                    inputValue={inputMessage}
+                    isLoading={isLoadingResponse}
+                    deepDebugActive={deepDebugActive}
+                    onDeepDebugActiveChange={handleDeepDebugActiveChange}
+                    botResponseStatus={botResponseStatus}
+                    activeDeepDebugId={activeDeepDebugId}
+                    modelType={selectedModel.type}
+                    modelName={selectedModel.name}
+                    onCanvasModeToggle={handleCanvasModeToggle}
+                  />
+                </AnimatedContent>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -15,6 +15,8 @@ interface HeaderProps {
   onLogoClick?: () => void;
   selectedModel?: ModelOption;
   onModelChange?: (model: ModelOption) => void;
+  isCanvasMode?: boolean;
+  onCanvasModeToggle?: (code?: string, language?: string) => void;
 }
 
 /**
@@ -27,7 +29,9 @@ const Header: React.FC<HeaderProps> = ({
   isSidebarOpen, 
   onLogoClick,
   selectedModel,
-  onModelChange 
+  onModelChange,
+  isCanvasMode = false,
+  onCanvasModeToggle
 }) => {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -142,6 +146,13 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  // 处理Canvas模式切换
+  const handleCanvasModeToggle = () => {
+    if (onCanvasModeToggle) {
+      onCanvasModeToggle(); // 不传递代码和语言参数，表示普通切换
+    }
+  };
+
   return (
     <header className="w-full py-3 px-4 flex justify-between items-center bg-transparent z-50">
       {/* 左侧控制区域 */}
@@ -172,6 +183,52 @@ const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
+        {/* Canvas模式切换按钮 - 新增 */}
+        <button 
+          aria-label={isCanvasMode ? "退出画布模式" : "进入画布模式"} 
+          className={`text-white focus-visible:bg-[#424242] hover:bg-[#424242] disabled:text-gray-600 h-10 rounded-lg px-2 focus-visible:outline-0 ${isCanvasMode ? 'bg-[#424242]' : ''}`}
+          onClick={handleCanvasModeToggle}
+          title={isCanvasMode ? "退出画布模式" : "进入画布模式"}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path 
+              d="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5Z" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+            <path 
+              d="M12 3V21" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+            <path 
+              d="M7 8H9" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+            <path 
+              d="M7 12H9" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+            <path 
+              d="M16 8L17 8" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
         {/* 模型选择下拉菜单 */}
         <button 
           aria-label={`模型选择器，当前模型为 ${currentModel.displayName}`} 
@@ -198,55 +255,43 @@ const Header: React.FC<HeaderProps> = ({
         {/* 模型下拉菜单 - 添加了动画和改进的样式 */}
         <div 
           className={`absolute top-14 left-0 overflow-hidden transition-all duration-300 ease-in-out transform origin-top-left z-10 ${
-            isModelMenuOpen 
-              ? 'opacity-100 scale-100 translate-y-2' 
-              : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+            isModelMenuOpen ? 'opacity-100 scale-100 max-h-[500px]' : 'opacity-0 scale-95 max-h-0'
           }`}
         >
-          <div className="bg-[#2D2D2D] border border-[#3D3D3D] rounded-xl shadow-xl w-72 overflow-hidden">
-            <div className="p-1">
-              {Object.keys(modelsByType).map((type, index) => (
-                <div key={type} className={index > 0 ? 'mt-1' : ''}>
-                  <div className="px-3 py-2 text-sm text-gray-400 font-medium flex items-center">
-                    {getProviderIcon(type)}
-                    <span className="ml-2">{getProviderName(type)}</span>
-                  </div>
-                  <div className="mb-1">
-                    {modelsByType[type].map(model => (
-                      <div 
-                        key={model.name}
-                        className={`flex items-center px-3 py-2 cursor-pointer rounded-lg mx-1 hover:bg-[#3D3D3D] text-white ${
-                          currentModel.name === model.name ? 'bg-[#3D3D3D]' : ''
-                        }`}
-                        onClick={() => selectModel(model)}
-                      >
-                        <div className="flex-1 flex items-center">
-                          <span className="ml-2">{model.displayName}</span>
-                        </div>
-                        {currentModel.name === model.name && (
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-400">
-                            <path d="M13.3334 4L6.00008 11.3333L2.66675 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+          <div className="bg-[#212121] rounded-lg shadow-lg border border-[#424242] min-w-[280px]">
+            {Object.keys(modelsByType).map((type) => (
+              <div key={type} className="border-b border-[#424242] last:border-b-0">
+                <div className="px-4 py-2 text-xs text-gray-400 uppercase font-semibold bg-[#262626]">
+                  {getProviderName(type)}
                 </div>
-              ))}
-            </div>
+                <div className="max-h-[240px] overflow-y-auto">
+                  {modelsByType[type].map((model) => (
+                    <div 
+                      key={model.name} 
+                      className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-[#424242] transition-colors ${
+                        currentModel.name === model.name && currentModel.type === model.type ? 'bg-[#363636]' : ''
+                      }`}
+                      onClick={() => selectModel(model)}
+                    >
+                      {getProviderIcon(model.type)}
+                      <span className="text-white">{model.displayName}</span>
+                      {currentModel.name === model.name && currentModel.type === model.type && (
+                        <svg className="ml-auto text-blue-500" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M13.3337 4.66669L6.00033 12L2.66699 8.66669" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 右侧Logo区域 - 修改为使用自定义点击处理函数 */}
-      <a 
-        aria-label="Draco Homepage" 
-        href="/" 
-        className="flex items-center gap-2"
-        onClick={handleLogoClick}
-      >
-        <img src={logo} alt="Draco Logo" className="h-8 w-auto" />
-        <span className="text-white font-bold text-xl tracking-wide">Draco</span>
+      {/* 右侧logo */}
+      <a href="/" onClick={handleLogoClick} className="h-10">
+        <img src={logo} alt="Logo" className="h-full" />
       </a>
     </header>
   );

@@ -7,7 +7,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import { Message } from '../services/chatService';
-import { CopyOutlined, CheckOutlined } from '@ant-design/icons';
+import { CopyOutlined, CheckOutlined, ExpandOutlined } from '@ant-design/icons';
 
 // 自定义代码高亮主题
 const customTheme = {
@@ -42,13 +42,15 @@ interface BotMessageProps {
   message: Message;
   status: MessageStatus;
   className?: string;
+  onCanvasModeToggle?: (code?: string, language?: string) => void; // 更新参数类型
 }
 
 // 代码块头部组件
 const CodeHeader: React.FC<{
   language: string;
   code: string;
-}> = ({ language, code }) => {
+  onCanvasModeToggle?: (code?: string, language?: string) => void; // 更新参数类型
+}> = ({ language, code, onCanvasModeToggle }) => {
   const [copied, setCopied] = useState(false);
   
   // 格式化语言名称
@@ -98,18 +100,38 @@ const CodeHeader: React.FC<{
       <div className="text-xs text-gray-400 font-mono">
         {formatLanguage(language)}
       </div>
-      <button 
-        onClick={copyToClipboard}
-        className="text-gray-400 hover:text-white transition-colors"
-        title="复制代码"
-        aria-label="复制代码"
-      >
-        {copied ? (
-          <CheckOutlined style={{ fontSize: '16px' }} />
-        ) : (
-          <CopyOutlined style={{ fontSize: '16px' }} />
+      <div className="flex items-center space-x-2">
+        {/* 新增: 进入Canvas模式按钮 */}
+        {onCanvasModeToggle && (
+          <button
+            onClick={() => onCanvasModeToggle(code, language)} // 传递当前代码块和语言信息
+            className="text-gray-400 hover:text-white transition-colors flex items-center"
+            title="查看此代码片段"
+            aria-label="查看此代码片段"
+          >
+            <div className="flex items-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1">
+                <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 3V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-xs">画布</span>
+            </div>
+          </button>
         )}
-      </button>
+        
+        <button 
+          onClick={copyToClipboard}
+          className="text-gray-400 hover:text-white transition-colors"
+          title="复制代码"
+          aria-label="复制代码"
+        >
+          {copied ? (
+            <CheckOutlined style={{ fontSize: '16px' }} />
+          ) : (
+            <CopyOutlined style={{ fontSize: '16px' }} />
+          )}
+        </button>
+      </div>
     </div>
   );
 };
@@ -118,10 +140,11 @@ const CodeHeader: React.FC<{
 const CodeBlock: React.FC<{
   language: string;
   children: string;
-}> = ({ language, children }) => {
+  onCanvasModeToggle?: (code?: string, language?: string) => void; // 更新参数类型
+}> = ({ language, children, onCanvasModeToggle }) => {
   return (
     <div className="rounded-md overflow-hidden border border-[#2F2F2F] -mx-6 -my-4">
-      <CodeHeader language={language} code={children} />
+      <CodeHeader language={language} code={children} onCanvasModeToggle={onCanvasModeToggle} />
       <SyntaxHighlighter
         style={customTheme}
         language={language}
@@ -137,7 +160,8 @@ const CodeBlock: React.FC<{
 const MarkdownRenderer: React.FC<{
   content: string;
   isStreaming?: boolean;
-}> = ({ content, isStreaming = false }) => {
+  onCanvasModeToggle?: (code?: string, language?: string) => void; // 更新参数类型
+}> = ({ content, isStreaming = false, onCanvasModeToggle }) => {
   // 定义代码渲染函数
   const renderCode = ({ node, inline, className, children, ...props }: CodeProps) => {
     // 获取代码内容，转为字符串便于判断
@@ -155,7 +179,7 @@ const MarkdownRenderer: React.FC<{
       // 处理作为代码块的代码
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : 'text'; // 如果没有指定语言，则默认使用'text'
-      return <CodeBlock language={language}>{codeContent}</CodeBlock>;
+      return <CodeBlock language={language} onCanvasModeToggle={onCanvasModeToggle}>{codeContent}</CodeBlock>;
     }
     
     // 对于内联代码，使用普通的<code>标签
@@ -249,7 +273,7 @@ const LoadingIndicator: React.FC = () => (
 );
 
 // 主组件
-const BotMessage: React.FC<BotMessageProps> = ({ message, status, className = '' }) => {
+const BotMessage: React.FC<BotMessageProps> = ({ message, status, className = '', onCanvasModeToggle }) => {
   const [displayedMessage, setDisplayedMessage] = useState<string>('');
   const prevContentRef = useRef<string>('');
   const messageContent = message.content || '';
@@ -278,7 +302,7 @@ const BotMessage: React.FC<BotMessageProps> = ({ message, status, className = ''
   return (
     <div className={`mb-10 ${className}`}>
       <div className="prose prose-invert w-full text-white break-words text-left prose-p:text-left prose-headings:text-left prose-ul:text-left prose-ol:text-left prose-p:w-full prose-pre:w-full max-w-none">
-        <MarkdownRenderer content={contentToDisplay} isStreaming={isStreaming} />
+        <MarkdownRenderer content={contentToDisplay} isStreaming={isStreaming} onCanvasModeToggle={onCanvasModeToggle} />
       </div>
     </div>
   );

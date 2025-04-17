@@ -389,6 +389,90 @@
           "content": "Hello! How can I assist you today?"
         }
       ]
+    },
+    "973abd42-7a1f-40ad-a0b3-4c4066c86ad8": {
+      "id": "973abd42-7a1f-40ad-a0b3-4c4066c86ad8",
+      "title": "hi",
+      "timestamp": 1744905901,
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        },
+        {
+          "role": "assistant",
+          "content": "出错了: 无法连接到Ollama服务 (http://localhost:11434): HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/tags (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x00000299622F4AD0>: Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。'))"
+        }
+      ]
+    },
+    "3ac67fd1-416d-4946-bf0a-bbb5149ef177": {
+      "id": "3ac67fd1-416d-4946-bf0a-bbb5149ef177",
+      "title": "hi",
+      "timestamp": 1744906009,
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        },
+        {
+          "role": "assistant",
+          "content": "出错了: module 'models.openai' has no attribute 'OpenaiModel'"
+        }
+      ]
+    },
+    "d23c51a4-b9e0-40cd-b42e-2d88ca24f6a8": {
+      "id": "d23c51a4-b9e0-40cd-b42e-2d88ca24f6a8",
+      "title": "hi",
+      "timestamp": 1744906150,
+      "messages": [
+        {
+          "content": "hi",
+          "role": "user"
+        },
+        {
+          "content": "Hello! How can I assist you today?",
+          "role": "assistant"
+        },
+        {
+          "role": "user",
+          "content": "我想要一段python代码"
+        },
+        {
+          "role": "assistant",
+          "content": "当然可以！请告诉我你需要什么样的Python代码。是某种特定的功能，还是一个示例程序？例如，数据处理、网络请求、图像处理等，或者其他特定任务？"
+        },
+        {
+          "role": "user",
+          "content": "for loop的sum代码"
+        },
+        {
+          "role": "assistant",
+          "content": "好的，下面是一个使用`for`循环计算列表中所有数字之和的Python代码示例：\n\n```python\n# 定义一个包含数字的列表\nnumbers = [1, 2, 3, 4, 5]\n\n# 初始化总和变量\ntotal_sum = 0\n\n# 使用for循环遍历列表中的每个数字\nfor number in numbers:\n    total_sum += number  # 将当前数字加到总和中\n\n# 打印计算出的总和\nprint(\"列表中所有数字的总和是:\", total_sum)\n```\n\n在这个示例中，我们定义了一个名为`numbers`的列表，其中包含了一些数字。然后，我们使用`for`循环遍历列表中的每一个数字，并将它们相加到`total_sum`变量中，最后打印出总和。"
+        }
+      ]
+    },
+    "3e650cdb-be63-45b0-b9cd-d3b1dcab893d": {
+      "id": "3e650cdb-be63-45b0-b9cd-d3b1dcab893d",
+      "title": "请给我几段简单的代码",
+      "timestamp": 1744909790,
+      "messages": [
+        {
+          "content": "请给我几段简单的代码",
+          "role": "user"
+        },
+        {
+          "content": "当然！以下是一些简单的Python代码示例：\n\n1. **打印“Hello, World!”**：\n    ```python\n    print(\"Hello, World!\")\n    ```\n\n2. **计算两个数的和**：\n    ```python\n    def add_numbers(a, b):\n        return a + b\n\n    result = add_numbers(3, 5)\n    print(\"The sum is:\", result)\n    ```\n\n3. **判断一个数是奇数还是偶数**：\n    ```python\n    number = 7\n\n    if number % 2 == 0:\n        print(f\"{number} is even.\")\n    else:\n        print(f\"{number} is odd.\")\n    ```\n\n4. **计算列表中所有数的平均值**：\n    ```python\n    numbers = [10, 20, 30, 40, 50]\n    average = sum(numbers) / len(numbers)\n    print(\"The average is:\", average)\n    ```\n\n5. **打印从1到10的数字**：\n    ```python\n    for i in range(1, 11):\n        print(i)\n    ```\n\n如果你需要针对某个特定主题或功能的代码示例，请告诉我！",
+          "role": "assistant"
+        },
+        {
+          "role": "user",
+          "content": "给出一个有着编译错误的python代码"
+        },
+        {
+          "role": "assistant",
+          "content": "当然，这里有一个简单的Python代码示例，它包含了编译错误：\n\n```python\ndef greet(name)\n    print(\"Hello, \" + name)\n\ngreet(\"Alice\")\n```\n\n在这个代码片段中，函数定义缺少了冒号(`:`)，这会导致语法错误。修正后的代码应该是：\n\n```python\ndef greet(name):\n    print(\"Hello, \" + name)\n\ngreet(\"Alice\")\n```\n\n如果有其他问题或需要更多示例，请随时告诉我！"
+        }
+      ]
     }
   }
 }

@@ -4,16 +4,45 @@
 """
 
 from typing import Dict, Any, Optional
+import sys
+import importlib
 
 from models.base import ModelInterface
-from models.openai import OpenAIModel
-from models.anthropic import AnthropicModel
-from models.deepseek import DeepseekModel
-from models.ollama import OllamaModel
-
 
 class ModelFactory:
     """模型工厂类"""
+    
+    @staticmethod
+    def _load_model_class(model_type: str):
+        """动态加载模型类
+        
+        Args:
+            model_type: 模型类型名称
+            
+        Returns:
+            模型类
+        """
+        try:
+            module = importlib.import_module(f"models.{model_type}")
+            
+            # 正确处理各种模型类名
+            model_class_names = {
+                "openai": "OpenAIModel",
+                "anthropic": "AnthropicModel",
+                "deepseek": "DeepseekModel",
+                "ollama": "OllamaModel"
+            }
+            
+            if model_type in model_class_names:
+                class_name = model_class_names[model_type]
+            else:
+                # 默认处理方式，用于新增模型
+                class_name = f"{model_type.capitalize()}Model"
+                
+            return getattr(module, class_name)
+        except (ImportError, AttributeError) as e:
+            print(f"导入模型 {model_type} 失败: {e}", file=sys.stderr)
+            raise
     
     @staticmethod
     def create_model(model_type: str, **kwargs) -> ModelInterface:
@@ -29,17 +58,17 @@ class ModelFactory:
         Raises:
             ValueError: 如果模型类型不受支持
         """
-        model_classes = {
-            "openai": OpenAIModel,
-            "anthropic": AnthropicModel,
-            "deepseek": DeepseekModel,
-            "ollama": OllamaModel
-        }
+        supported_types = ['openai', 'anthropic', 'deepseek', 'ollama']
         
-        if model_type not in model_classes:
-            raise ValueError(f"不支持的模型类型: {model_type}，支持的类型有: {', '.join(model_classes.keys())}")
+        if model_type not in supported_types:
+            raise ValueError(f"不支持的模型类型: {model_type}，支持的类型有: {', '.join(supported_types)}")
         
-        return model_classes[model_type](**kwargs)
+        try:
+            model_class = ModelFactory._load_model_class(model_type)
+            return model_class(**kwargs)
+        except Exception as e:
+            print(f"创建模型 {model_type} 实例失败: {e}", file=sys.stderr)
+            raise
     
     @staticmethod
     def get_available_models() -> Dict[str, Any]:
@@ -69,10 +98,12 @@ class ModelFactory:
         
         # 获取ollama模型列表
         try:
+            OllamaModel = ModelFactory._load_model_class("ollama")
             ollama_model = OllamaModel()
             ollama_models = ollama_model.get_available_models()
             models["ollama"] = ollama_models
-        except Exception:
+        except Exception as e:
+            print(f"获取Ollama模型列表失败: {e}", file=sys.stderr)
             # 如果获取本地Ollama模型失败，添加默认模型
             models["ollama"] = [
                 {"name": "qwen2.5-coder", "type": "ollama", "provider": "Ollama"},
@@ -89,8 +120,9 @@ class ModelFactory:
         Returns:
             默认模型的配置
         """
+        from config import Config
         return {
-            "type": "ollama",
-            "name": "qwen2.5-coder",
-            "provider": "Ollama"
+            "type": Config.DEFAULT_MODEL_TYPE,
+            "name": Config.DEFAULT_MODEL_NAME,
+            "provider": "OpenAI" if Config.DEFAULT_MODEL_TYPE == "openai" else "Ollama"
         } 

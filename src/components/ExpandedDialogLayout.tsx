@@ -17,6 +17,7 @@ interface ExpandedDialogLayoutProps {
   activeDeepDebugId?: string;
   modelType?: string;
   modelName?: string;
+  onCanvasModeToggle?: (code?: string, language?: string) => void;
 }
 
 /**
@@ -35,7 +36,8 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
   onDeepDebugActiveChange,
   activeDeepDebugId,
   modelType,
-  modelName
+  modelName,
+  onCanvasModeToggle
 }) => {
   // 机器人是否正在回复
   const isLoading = externalIsLoading !== undefined ? externalIsLoading : (botResponseStatus === 'loading' || botResponseStatus === 'streaming');
@@ -250,6 +252,7 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
         <BotMessage 
           message={msg} 
           status={botResponseStatus} 
+          onCanvasModeToggle={onCanvasModeToggle}
         />
       );
     }
