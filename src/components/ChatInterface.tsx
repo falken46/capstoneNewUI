@@ -64,6 +64,8 @@ const ChatInterface: React.FC = () => {
   const [isCanvasMode, setIsCanvasMode] = useState(false);
   // 添加一个新状态来存储当前选择的代码片段
   const [selectedCodeSnippet, setSelectedCodeSnippet] = useState<{code: string, language: string} | null>(null);
+  // 添加Canvas模式动画状态
+  const [canvasAnimationState, setCanvasAnimationState] = useState<'entering' | 'entered' | 'exiting' | 'exited'>('exited');
 
   // 刷新聊天列表的方法
   const triggerChatListRefresh = () => {
@@ -83,21 +85,28 @@ const ChatInterface: React.FC = () => {
     setDeepDebugActive(isActive);
   };
 
-  // 处理Canvas模式切换
-  const handleCanvasModeToggle = (code?: string, language?: string) => {
-    if (code && language) {
-      // 如果提供了代码和语言，说明是从特定代码片段点击的
-      setSelectedCodeSnippet({ code, language });
-      setIsCanvasMode(true);
-    } else {
-      // 如果没有提供代码和语言，则是普通的切换操作
-      if (isCanvasMode) {
-        // 退出Canvas模式时清空选中的代码片段
+  // 添加或更新Canvas模式切换处理函数
+  const handleCanvasModeToggle = useCallback((code?: string, language?: string) => {
+    if (isCanvasMode) {
+      // 退出Canvas模式
+      setCanvasAnimationState('exiting');
+      // 使用setTimeout延迟状态更新，等待动画完成
+      setTimeout(() => {
+        setIsCanvasMode(false);
         setSelectedCodeSnippet(null);
-      }
-      setIsCanvasMode(!isCanvasMode);
+        setCanvasAnimationState('exited');
+      }, 300); // 与CSS动画持续时间匹配
+    } else {
+      // 进入Canvas模式 - 简化动画，直接进入
+      setIsCanvasMode(true);
+      setSelectedCodeSnippet(code && language ? { code, language } : null);
+      setCanvasAnimationState('entering');
+      // 直接设置为已进入状态，不再有中间过渡
+      setTimeout(() => {
+        setCanvasAnimationState('entered');
+      }, 300); // 与CSS动画持续时间匹配
     }
-  };
+  }, [isCanvasMode]);
 
   // 从URL加载聊天记录
   useEffect(() => {
@@ -463,8 +472,6 @@ const ChatInterface: React.FC = () => {
             onLogoClick={handleLogoClick}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
-            isCanvasMode={isCanvasMode}
-            onCanvasModeToggle={handleCanvasModeToggle}
           />
         </FadeContent>
         
@@ -478,8 +485,8 @@ const ChatInterface: React.FC = () => {
             {/* Canvas模式下的分屏布局 */}
             {isCanvasMode ? (
               <>
-                {/* 左侧聊天区域 - 占40% */}
-                <div className="w-2/5 h-full border-r border-[#333] overflow-hidden flex flex-col">
+                {/* 左侧聊天区域 - 调整宽度比例以获得更好的阅读体验 */}
+                <div className="w-[45%] h-full border-r border-[#333] overflow-hidden flex flex-col transition-all duration-300 ease-in-out">
                   <div className="flex-1 overflow-y-auto relative min-h-0">
                     <ExpandedDialogLayout 
                       messages={chatHistory}
@@ -494,17 +501,24 @@ const ChatInterface: React.FC = () => {
                       modelType={selectedModel.type}
                       modelName={selectedModel.name}
                       onCanvasModeToggle={handleCanvasModeToggle}
+                      isCanvasMode={isCanvasMode}
                     />
                   </div>
                 </div>
 
-                {/* 右侧画布区域 - 占60% */}
-                <div className="w-3/5 h-full overflow-hidden">
+                {/* 右侧画布区域 - 传递动画状态到CanvasMode组件 */}
+                <div className={`w-[55%] h-full overflow-hidden transition-all duration-300 ease-in-out ${
+                  canvasAnimationState === 'entering' ? 'translate-x-full opacity-0' : 
+                  canvasAnimationState === 'entered' ? 'translate-x-0 opacity-100' : 
+                  canvasAnimationState === 'exiting' ? 'translate-x-full opacity-0' : 
+                  'translate-x-full opacity-0'
+                }`}>
                   <CanvasMode 
                     messages={chatHistory}
                     className="h-full"
                     onCanvasModeToggle={handleCanvasModeToggle}
                     selectedCodeSnippet={selectedCodeSnippet}
+                    animationState={canvasAnimationState}
                   />
                 </div>
               </>
@@ -548,6 +562,7 @@ const ChatInterface: React.FC = () => {
                     modelType={selectedModel.type}
                     modelName={selectedModel.name}
                     onCanvasModeToggle={handleCanvasModeToggle}
+                    isCanvasMode={isCanvasMode}
                   />
                 </AnimatedContent>
               </>

@@ -101,13 +101,13 @@ const CodeHeader: React.FC<{
         {formatLanguage(language)}
       </div>
       <div className="flex items-center space-x-2">
-        {/* 新增: 进入Canvas模式按钮 */}
+        {/* 新增: 进入Canvas模式按钮 - 只在代码块内显示 */}
         {onCanvasModeToggle && (
           <button
             onClick={() => onCanvasModeToggle(code, language)} // 传递当前代码块和语言信息
             className="text-gray-400 hover:text-white transition-colors flex items-center"
-            title="查看此代码片段"
-            aria-label="查看此代码片段"
+            title="在画布模式中查看此代码片段"
+            aria-label="在画布模式中查看此代码片段"
           >
             <div className="flex items-center">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1">

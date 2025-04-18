@@ -18,6 +18,7 @@ interface ExpandedDialogLayoutProps {
   modelType?: string;
   modelName?: string;
   onCanvasModeToggle?: (code?: string, language?: string) => void;
+  isCanvasMode?: boolean;
 }
 
 /**
@@ -37,7 +38,8 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
   activeDeepDebugId,
   modelType,
   modelName,
-  onCanvasModeToggle
+  onCanvasModeToggle,
+  isCanvasMode = false
 }) => {
   // 机器人是否正在回复
   const isLoading = externalIsLoading !== undefined ? externalIsLoading : (botResponseStatus === 'loading' || botResponseStatus === 'streaming');
@@ -276,8 +278,9 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
         }}
       >
         {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
-        <div className="max-w-3xl mx-auto pt-4 pb-2"> 
-          <div className="w-[95%] mx-auto">
+        <div className="max-w-4xl mx-auto pt-4 pb-2"> 
+          {/* 始终保持固定内边距，不再根据Canvas模式动态变化 */}
+          <div className="w-[95%] mx-auto px-5">
             {messages.map((msg, index) => {
               const key = `message-${index}-${msg.role}`;
               return (
@@ -295,18 +298,21 @@ const ExpandedDialogLayout: React.FC<ExpandedDialogLayoutProps> = ({
       {/* 输入框区域：固定在底部，不收缩 */}
       <div className="w-full bg-[#212121] flex-shrink-0">
          {/* 内部容器：限制宽度、居中、添加垂直内边距 */}
-         <div className="max-w-3xl mx-auto py-4">
-          <InputBox 
-            inputValue={inputValue}
-            onInputChange={onInputChange}
-            onSubmit={handleSubmitWithScroll}
-            placeholder="继续输入您的问题..."
-            layoutMode="expanded"
-            containerClassName="w-full"
-            isLoading={isLoading}
-            deepDebugActive={deepDebugActive}
-            onDeepDebugActiveChange={onDeepDebugActiveChange}
-          />
+         <div className="max-w-4xl mx-auto py-4">
+          {/* 始终保持固定内边距 */}
+          <div className="px-5">
+            <InputBox 
+              inputValue={inputValue}
+              onInputChange={onInputChange}
+              onSubmit={handleSubmitWithScroll}
+              placeholder="继续输入您的问题..."
+              layoutMode="expanded"
+              containerClassName="w-full"
+              isLoading={isLoading}
+              deepDebugActive={deepDebugActive}
+              onDeepDebugActiveChange={onDeepDebugActiveChange}
+            />
+          </div>
         </div>
       </div>
 

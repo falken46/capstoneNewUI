@@ -15,8 +15,6 @@ interface HeaderProps {
   onLogoClick?: () => void;
   selectedModel?: ModelOption;
   onModelChange?: (model: ModelOption) => void;
-  isCanvasMode?: boolean;
-  onCanvasModeToggle?: (code?: string, language?: string) => void;
 }
 
 /**
@@ -30,8 +28,6 @@ const Header: React.FC<HeaderProps> = ({
   onLogoClick,
   selectedModel,
   onModelChange,
-  isCanvasMode = false,
-  onCanvasModeToggle
 }) => {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -146,13 +142,6 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 处理Canvas模式切换
-  const handleCanvasModeToggle = () => {
-    if (onCanvasModeToggle) {
-      onCanvasModeToggle(); // 不传递代码和语言参数，表示普通切换
-    }
-  };
-
   return (
     <header className="w-full py-3 px-4 flex justify-between items-center bg-transparent z-50">
       {/* 左侧控制区域 */}
@@ -182,52 +171,6 @@ const Header: React.FC<HeaderProps> = ({
             </svg>
           </button>
         )}
-
-        {/* Canvas模式切换按钮 - 新增 */}
-        <button 
-          aria-label={isCanvasMode ? "退出画布模式" : "进入画布模式"} 
-          className={`text-white focus-visible:bg-[#424242] hover:bg-[#424242] disabled:text-gray-600 h-10 rounded-lg px-2 focus-visible:outline-0 ${isCanvasMode ? 'bg-[#424242]' : ''}`}
-          onClick={handleCanvasModeToggle}
-          title={isCanvasMode ? "退出画布模式" : "进入画布模式"}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path 
-              d="M3 5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5Z" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
-            <path 
-              d="M12 3V21" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
-            <path 
-              d="M7 8H9" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
-            <path 
-              d="M7 12H9" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
-            <path 
-              d="M16 8L17 8" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
 
         {/* 模型选择下拉菜单 */}
         <button 

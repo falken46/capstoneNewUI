@@ -54,6 +54,7 @@ interface CanvasModeProps {
   className?: string;
   onCanvasModeToggle?: (code?: string, language?: string) => void;
   selectedCodeSnippet?: { code: string, language: string } | null;
+  animationState?: 'entering' | 'entered' | 'exiting' | 'exited';
 }
 
 // 声明错误类型接口
@@ -119,7 +120,8 @@ const CanvasMode: React.FC<CanvasModeProps> = ({
   messages, 
   className = '', 
   onCanvasModeToggle,
-  selectedCodeSnippet 
+  selectedCodeSnippet,
+  animationState = 'entered'
 }) => {
   const [codeSnippets, setCodeSnippets] = useState<Array<{ code: string, language: string }>>([]);
   const [editableCode, setEditableCode] = useState<string>('');
@@ -306,6 +308,10 @@ const CanvasMode: React.FC<CanvasModeProps> = ({
 import sys
 from pyodide.console import Console
 import io
+import builtins
+
+# 保存原始input函数
+original_input = builtins.input
 
 # 创建自定义输出流
 captured_stdout = io.StringIO()
@@ -319,12 +325,26 @@ original_stderr = sys.stderr
 sys.stdout = captured_stdout
 sys.stderr = captured_stderr
 
+# 重写input函数，避免弹窗
+def custom_input(prompt=""):
+    # 先输出提示信息
+    if prompt:
+        print(f"{prompt} [注意: Web环境不支持输入，请直接修改代码提供输入值]")
+    # 返回一个固定值
+    return "无法在Web环境接收输入，请修改代码提供固定输入"
+
+# 替换全局input函数
+builtins.input = custom_input
+
 try:
 ${code.split('\n').map(line => '    ' + line).join('\n')}
 finally:
     # 恢复原始输出流
     sys.stdout = original_stdout
     sys.stderr = original_stderr
+    
+    # 恢复原始input函数
+    builtins.input = original_input
     
     # 获取捕获的输出
     output = captured_stdout.getvalue()
@@ -487,7 +507,7 @@ finally:
   // 如果没有代码片段，显示提示信息
   if (codeSnippets.length === 0) {
     return (
-      <div className={`h-full flex items-center justify-center bg-[#1e1e1e] ${className}`}>
+      <div className={`h-full flex items-center justify-center bg-[#1e1e1e] ${className} ${animationState === 'entering' ? 'animate-slide-in' : animationState === 'exiting' ? 'animate-slide-out' : ''}`}>
         <div className="text-gray-400 text-center p-8">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
@@ -512,7 +532,7 @@ finally:
   }
 
   return (
-    <div className={`h-full overflow-hidden bg-[#1e1e1e] flex flex-col ${className}`}>
+    <div className={`h-full overflow-hidden bg-[#1e1e1e] flex flex-col ${className} ${animationState === 'entering' ? 'animate-slide-in' : animationState === 'exiting' ? 'animate-slide-out' : ''}`}>
       {/* VSCode风格的顶部菜单栏 */}
       <div className="bg-[#252526] py-1 px-4 flex items-center justify-between border-b border-[#1e1e1e]">
         <div className="flex items-center">
@@ -678,7 +698,7 @@ finally:
               lineProps={lineNumber => ({
                 style: { 
                   display: 'block', 
-                  backgroundColor: lineNumber % 5 === 0 ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                  backgroundColor: 'transparent',
                   position: 'relative',
                 },
                 className: 'relative',
