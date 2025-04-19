@@ -134,6 +134,17 @@ const ChatInterface: React.FC = () => {
       const chatDetail = await getChatDetail(id);
       setChatHistory(chatDetail.messages || []);
       setLayoutMode('expanded');
+      
+      // 添加这段代码以更新时间戳并保存回服务器
+      // 这将使最近访问的聊天记录移动到列表顶部
+      try {
+        // 简单地保存现有消息就会更新时间戳
+        await saveChatHistory(chatDetail.messages || [], id);
+        // 刷新聊天列表以显示更新后的排序
+        triggerChatListRefresh();
+      } catch (saveError) {
+        console.error('更新聊天记录时间戳失败:', saveError);
+      }
     } catch (error) {
       console.error('获取聊天记录详情失败:', error);
       setChatHistory([]);
