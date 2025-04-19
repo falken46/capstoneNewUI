@@ -121,6 +121,14 @@ const ChatInterface: React.FC = () => {
 
   // 加载特定聊天记录的详情
   const loadChatDetail = async (id: string) => {
+    // 如果当前是Canvas模式，需要先退出
+    if (isCanvasMode) {
+      setCanvasAnimationState('exiting');
+      setIsCanvasMode(false);
+      setSelectedCodeSnippet(null);
+      setCanvasAnimationState('exited');
+    }
+
     setIsLoading(true);
     try {
       const chatDetail = await getChatDetail(id);
@@ -379,6 +387,16 @@ const ChatInterface: React.FC = () => {
   
   // 处理新建按钮点击，切换回紧凑布局
   const handleNewChat = () => {
+    // 如果当前是Canvas模式，需要先退出
+    if (isCanvasMode) {
+      setCanvasAnimationState('exiting');
+      setTimeout(() => {
+        setIsCanvasMode(false);
+        setSelectedCodeSnippet(null);
+        setCanvasAnimationState('exited');
+      }, 300);
+    }
+
     // 切换回紧凑布局
     setLayoutMode('compact');
     // 清空消息和聊天历史
@@ -513,13 +531,15 @@ const ChatInterface: React.FC = () => {
                   canvasAnimationState === 'exiting' ? 'translate-x-full opacity-0' : 
                   'translate-x-full opacity-0'
                 }`}>
-                  <CanvasMode 
-                    messages={chatHistory}
-                    className="h-full"
-                    onCanvasModeToggle={handleCanvasModeToggle}
-                    selectedCodeSnippet={selectedCodeSnippet}
-                    animationState={canvasAnimationState}
-                  />
+                  {(canvasAnimationState === 'entering' || canvasAnimationState === 'entered') && (
+                    <CanvasMode 
+                      messages={chatHistory}
+                      className="h-full"
+                      onCanvasModeToggle={handleCanvasModeToggle}
+                      selectedCodeSnippet={selectedCodeSnippet}
+                      animationState={canvasAnimationState}
+                    />
+                  )}
                 </div>
               </>
             ) : (
