@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getChatList, deleteChatHistory } from '../services/chatService';
+
+interface ChatItem {
+  id: string;
+  title: string;
+  timestamp: number;
+}
 
 interface SidebarProps {
   isOpen: boolean;
   onSidebarToggle?: () => void;
   onNewChat?: () => void;
+  currentChatId?: string;
+  onSelectChat?: (chatId: string) => void;
+  shouldRefreshChatList?: number; // 刷新标志，每次变化时触发刷新
+  triggerChatListRefresh?: () => void; // 刷新聊天列表的方法
 }
 
 /**
@@ -11,7 +23,97 @@ interface SidebarProps {
  * 背景颜色：#171717
  * 显示在页面左侧
  */
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onSidebarToggle, onNewChat }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  isOpen, 
+  onSidebarToggle, 
+  onNewChat, 
+  currentChatId,
+  onSelectChat,
+  shouldRefreshChatList,
+  triggerChatListRefresh
+}) => {
+  const [chatList, setChatList] = useState<ChatItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  // 加载聊天记录列表
+  const loadChatList = async () => {
+    if (!isOpen) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await getChatList();
+      setChatList(response.chats || []);
+    } catch (error) {
+      console.error('获取聊天列表失败:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 定期刷新聊天列表
+  useEffect(() => {
+    // 立即加载一次
+    if (isOpen) {
+      loadChatList();
+    }
+    
+    // 设置定时器，每30秒刷新一次
+    const intervalId = setInterval(() => {
+      if (isOpen) {
+        loadChatList();
+      }
+    }, 30000);
+    
+    // 组件卸载时清除定时器
+    return () => clearInterval(intervalId);
+  }, [isOpen]);
+
+  // 当刷新标志变化时，刷新聊天列表
+  useEffect(() => {
+    if (shouldRefreshChatList && isOpen) {
+      loadChatList();
+    }
+  }, [shouldRefreshChatList, isOpen]);
+
+  // 处理聊天选择
+  const handleSelectChat = (chatId: string) => {
+    if (onSelectChat) {
+      onSelectChat(chatId);
+    } else {
+      navigate(`/chat/${chatId}`);
+    }
+  };
+
+  // 处理删除聊天记录
+  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation(); // 阻止冒泡，避免触发聊天选择
+    
+    setDeletingChatId(chatId);
+    try {
+      await deleteChatHistory(chatId);
+      
+      // 如果删除的是当前正在查看的聊天，则导航到新聊天页面
+      if (chatId === currentChatId && onNewChat) {
+        onNewChat();
+      }
+      
+      // 刷新聊天列表
+      loadChatList();
+      
+      if (triggerChatListRefresh) {
+        triggerChatListRefresh();
+      }
+    } catch (error) {
+      console.error('删除聊天记录失败:', error);
+      alert('删除聊天记录失败');
+    } finally {
+      setDeletingChatId(null);
+    }
+  };
+
   return (
     <div 
       className={`h-screen overflow-hidden bg-[#171717] transition-all duration-300 ease-in-out flex-shrink-0 ${
@@ -46,11 +148,57 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onSidebarToggle, onNewChat })
           </button>
         </div>
         
-        {/* 侧边栏内容区域 */}
-        <div className="flex-1 mt-2 pt-4">
-          <div className="text-white/70 text-sm whitespace-nowrap">
-            侧边栏内容区域
-          </div>
+        {/* 侧边栏内容区域 - 聊天记录列表 */}
+        <div className="flex-1 mt-2 overflow-y-auto">
+          {isLoading ? (
+            <div className="text-gray-400 text-sm text-center py-4">加载中...</div>
+          ) : chatList.length === 0 ? (
+            <div className="text-gray-400 text-sm text-center py-4">暂无聊天记录</div>
+          ) : (
+            <div className="space-y-1">
+              {chatList.map(chat => (
+                <div
+                  key={chat.id}
+                  className={`rounded-lg px-3 py-2 transition-colors text-sm ${
+                    currentChatId === chat.id 
+                      ? 'bg-[#3D3D3D] text-white' 
+                      : 'text-gray-300 hover:bg-[#2D2D2D]'
+                  }`}
+                  onMouseEnter={() => setHoveredChatId(chat.id)}
+                  onMouseLeave={() => setHoveredChatId(null)}
+                >
+                  <div className="flex justify-between items-center">
+                    <button
+                      onClick={() => handleSelectChat(chat.id)}
+                      className={`truncate flex-1 font-medium text-left`}
+                    >
+                      {chat.title}
+                    </button>
+                    {(hoveredChatId === chat.id || deletingChatId === chat.id) && (
+                      <button
+                        aria-label="删除聊天"
+                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                        className="text-gray-400 hover:text-red-400 ml-2 px-1 transition-opacity"
+                        disabled={deletingChatId === chat.id}
+                      >
+                        {deletingChatId === chat.id ? (
+                          <span className="text-xs">删除中...</span>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

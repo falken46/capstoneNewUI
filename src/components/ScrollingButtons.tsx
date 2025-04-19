@@ -11,6 +11,7 @@ interface ScrollingButtonsProps {
   buttonsData: ButtonData[];
   scrollSpeed?: number; // 以秒为单位的滚动周期
   className?: string;
+  disabled?: boolean; // 添加禁用属性
 }
 
 /**
@@ -20,7 +21,8 @@ interface ScrollingButtonsProps {
 const ScrollingButtons: React.FC<ScrollingButtonsProps> = ({ 
   buttonsData, 
   scrollSpeed = 30, 
-  className = "" 
+  className = "",
+  disabled = false
 }) => {
   // 定义内联样式
   const scrollContainerStyles: CSSProperties = {
@@ -41,11 +43,13 @@ const ScrollingButtons: React.FC<ScrollingButtonsProps> = ({
     gap: '8px',
     padding: '8px 0',
     width: 'max-content',
-    animation: `scrollLeftInfinite ${scrollSpeed}s linear infinite`
+    animation: `scrollLeftInfinite ${scrollSpeed}s linear infinite`,
+    opacity: disabled ? 0.5 : 1,
+    pointerEvents: disabled ? 'none' : 'auto'
   };
 
   const handleButtonClick = (button: ButtonData) => {
-    if (button.onClick) {
+    if (!disabled && button.onClick) {
       button.onClick();
     }
   };
@@ -77,9 +81,12 @@ const ScrollingButtons: React.FC<ScrollingButtonsProps> = ({
             <div 
               key={`btn-${button.id}`} 
               role="button" 
-              className="flex items-center text-[#e0e0e0] text-sm font-medium rounded-2xl px-3 py-2 border border-[#494A4C] hover:border-[#6e6e6e] hover:bg-[#5a5a5a] hover:text-white cursor-pointer transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
-              tabIndex={0}
+              className={`flex items-center text-[#e0e0e0] text-sm font-medium rounded-2xl px-3 py-2 border border-[#494A4C] ${
+                disabled ? 'cursor-not-allowed' : 'hover:border-[#6e6e6e] hover:bg-[#5a5a5a] hover:text-white cursor-pointer'
+              } transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-ring`}
+              tabIndex={disabled ? -1 : 0}
               onClick={() => handleButtonClick(button)}
+              aria-disabled={disabled}
             >
               {button.icon}
               <p className="overflow-hidden whitespace-nowrap text-ellipsis">{button.text}</p>
@@ -91,9 +98,12 @@ const ScrollingButtons: React.FC<ScrollingButtonsProps> = ({
             <div 
               key={`btn-clone-${button.id}`} 
               role="button" 
-              className="flex items-center text-[#e0e0e0] text-sm font-medium rounded-2xl px-3 py-2 border border-[#494A4C] hover:border-[#6e6e6e] hover:bg-[#5a5a5a] hover:text-white cursor-pointer transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
-              tabIndex={0}
+              className={`flex items-center text-[#e0e0e0] text-sm font-medium rounded-2xl px-3 py-2 border border-[#494A4C] ${
+                disabled ? 'cursor-not-allowed' : 'hover:border-[#6e6e6e] hover:bg-[#5a5a5a] hover:text-white cursor-pointer'
+              } transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-ring`}
+              tabIndex={disabled ? -1 : 0}
               onClick={() => handleButtonClick(button)}
+              aria-disabled={disabled}
             >
               {button.icon}
               <p className="overflow-hidden whitespace-nowrap text-ellipsis">{button.text}</p>
